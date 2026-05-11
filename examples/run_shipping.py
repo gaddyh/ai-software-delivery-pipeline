@@ -9,7 +9,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from dotenv import load_dotenv
 
-from ai_delivery.models.task_spec import TaskSpec
 from ai_delivery.pipeline.run import RunPipeline
 
 
@@ -22,16 +21,11 @@ def main():
     if not os.getenv("OPENAI_API_KEY"):
         print("Warning: OPENAI_API_KEY not set. Using placeholder implementation.")
 
-    # Define the task
-    task_spec = TaskSpec(
-        raw_requirement="Create a simple Python function that calculates the factorial of a number",
-        function_name="factorial",
-        function_signature="def factorial(n: int) -> int",
-        module_name="solution",
-        description="Create a simple Python function that calculates the factorial of a number",
-        constraints=["Use recursion or iteration", "No external libraries"],
-        success_criteria=["Correctly calculates factorial for positive integers", "Handles edge case of 0"],
-        edge_cases=["n = 0", "n = 1", "negative numbers"],
+    # Define the task as a plain user message
+    user_message = (
+        "Write a function factorial(n: int) -> int that calculates "
+        "the factorial of a number using recursion. "
+        "Handle negative inputs by raising a ValueError."
     )
 
     # Initialize the pipeline
@@ -42,14 +36,15 @@ def main():
     print("=" * 60)
     print("AI Software Delivery Pipeline")
     print("=" * 60)
-    results = pipeline.run(task_spec)
+    results = pipeline.run(user_message)
 
     # Print summary
     print("\n" + "=" * 60)
     print("Pipeline Summary")
     print("=" * 60)
     print(f"Run ID: {results['run_id']}")
-    print(f"Task: {task_spec.description}")
+    task_spec = results.get("task_spec")
+    print(f"Task: {task_spec.description if task_spec else user_message}")
     print(f"Success: {results['success']}")
     print(f"Iterations: {results.get('iterations', 'N/A')}")
 

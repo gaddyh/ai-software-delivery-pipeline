@@ -50,7 +50,7 @@ def _extract_traceback(output: str) -> str:
 
 
 class RunPipeline:
-    """Pipeline that runs the six-stage TDG loop once per task."""
+    """Pipeline that runs the six-stage TDG loop for each task."""
 
     def __init__(self, artifacts_dir: str = "artifacts/runs"):
         """Initialize the pipeline."""
@@ -60,15 +60,15 @@ class RunPipeline:
         self.developer = DeveloperAgent()
         self.tester = TesterAgent()
 
-    def run(self, task_spec: TaskSpec) -> dict:
-        """Execute the six-stage TDG loop for the given task."""
+    def run(self, user_message: str) -> dict:
+        """Execute the six-stage TDG loop for the given user message."""
         run_id = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
         run_dir = self.artifacts_dir / run_id
         run_dir.mkdir(parents=True, exist_ok=True)
 
         results = {
             "run_id": run_id,
-            "task_spec": task_spec,
+            "task_spec": None,
             "code_artifact": None,
             "test_artifact": None,
             "execution_result": None,
@@ -82,6 +82,8 @@ class RunPipeline:
 
         try:
             # ── Stage 1: Task assignment ──────────────────────────────────
+            task_spec = self.orchestrator.assign_task(user_message)
+            results["task_spec"] = task_spec
             print(f"\nStage 1 \u2502 Task assigned: {task_spec.description}")
 
             # ── Stage 2: Initial code synthesis ──────────────────────────
@@ -171,7 +173,7 @@ class RunPipeline:
         summary = {
             "run_id": run_id,
             "timestamp": datetime.utcnow().isoformat(),
-            "task_description": task_spec.description,
+            "task_description": results["task_spec"].description if results.get("task_spec") else user_message,
             "success": results.get("success", False),
             "iterations": results.get("iterations", 0),
             "execution_status": results["execution_result"].status.value
