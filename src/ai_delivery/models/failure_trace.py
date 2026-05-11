@@ -9,6 +9,8 @@ class IterationRecord(BaseModel):
     iteration: int = Field(..., description="Iteration number (1-based)")
     failed_tests: list[str] = Field(default_factory=list, description="Names of failed tests")
     traceback_summary: str = Field(default="", description="First error block from pytest output")
+    pytest_output: str = Field(default="", description="Full pytest stdout from this iteration")
+    code_snapshot: str = Field(default="", description="Code version that produced these failures")
     exit_code: int = Field(..., description="Pytest exit code")
 
 

@@ -14,14 +14,18 @@ class DeveloperAgent:
         self.model_name = model_name
 
     def generate_code(
-        self, task_spec: TaskSpec, failure_trace: Optional[FailureTrace] = None
+        self,
+        task_spec: TaskSpec,
+        failure_trace: Optional[FailureTrace] = None,
+        current_code: str = "",
     ) -> GeneratedArtifact:
         """Generate code for the task.
 
         On first call (no failure_trace) produces a stub that intentionally
         omits the target function, triggering the refinement loop.
         On subsequent calls (with failure_trace) produces the correct
-        implementation informed by prior test failures.
+        implementation informed by prior test failures, the current code
+        version, and the complete pytest output stored in the trace.
         """
         fn = task_spec.function_name
         iteration = len(failure_trace.history) + 1 if failure_trace else 1

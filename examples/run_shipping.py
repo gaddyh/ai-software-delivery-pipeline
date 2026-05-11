@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 from dotenv import load_dotenv
 
 from ai_delivery.models.task_spec import TaskSpec
-from ai_delivery.pipeline.run_once import RunOncePipeline
+from ai_delivery.pipeline.run_once import RunPipeline
 
 
 def main():
@@ -36,7 +36,7 @@ def main():
 
     # Initialize the pipeline
     artifacts_dir = os.getenv("ARTIFACTS_DIR", "artifacts/runs")
-    pipeline = RunOncePipeline(artifacts_dir=artifacts_dir)
+    pipeline = RunPipeline(artifacts_dir=artifacts_dir)
 
     # Run the pipeline
     print("=" * 60)

@@ -2,6 +2,8 @@
 
 import json
 import os
+import re
+import traceback
 from pathlib import Path
 from datetime import datetime
 from typing import Optional
@@ -18,21 +20,36 @@ MAX_ITERATIONS = 3
 
 
 def _extract_traceback(output: str) -> str:
-    """Extract the first error block from pytest stdout."""
-    lines = output.splitlines()
-    capture = False
-    block: list[str] = []
-    for line in lines:
-        if line.startswith("FAILED") or "Error" in line or "assert" in line.lower():
-            capture = True
-        if capture:
-            block.append(line)
-            if len(block) >= 10:
-                break
-    return "\n".join(block)
+    """Extract structured error info from pytest stdout.
+
+    Mirrors the structured fields produced by Python's traceback module:
+    file name, line number, function name, and error message.
+    """
+    # "  <file>.py:<lineno>: <context>" — pytest failure location lines
+    location_re = re.compile(r"^\s{0,4}(\S+\.py):(\d+):\s+(.+)$", re.MULTILINE)
+    # Pytest error lines prefixed with "E "
+    error_re = re.compile(r"^E\s{1,3}(.+)$", re.MULTILINE)
+
+    locations = location_re.findall(output)
+    errors = error_re.findall(output)
+
+    if not locations and not errors:
+        # Fallback: first 10 lines containing recognisable failure keywords
+        keywords = [l for l in output.splitlines()
+                    if "Error" in l or "FAILED" in l or "assert" in l.lower()]
+        return "\n".join(keywords[:10])
+
+    parts: list[str] = []
+    if locations:
+        filename, lineno, context = locations[0]
+        parts.append(f'File "{filename}", line {lineno}, in {context}')
+    if errors:
+        parts.append(f"  {errors[0]}")
+
+    return "\n".join(parts)
 
 
-class RunOncePipeline:
+class RunPipeline:
     """Pipeline that runs the six-stage TDG loop once per task."""
 
     def __init__(self, artifacts_dir: str = "artifacts/runs"):
@@ -112,6 +129,8 @@ class RunOncePipeline:
                     iteration=iteration,
                     failed_tests=failed_tests,
                     traceback_summary=_extract_traceback(execution_result.output),
+                    pytest_output=execution_result.output,
+                    code_snapshot=current_code_file.read_text(),
                     exit_code=execution_result.exit_code,
                 )
                 if failure_trace is None:
@@ -120,8 +139,10 @@ class RunOncePipeline:
                     failure_trace.history.append(record)
 
                 if iteration < MAX_ITERATIONS:
-                    print(f"  \u2192 Sending FailureTrace (iteration {iteration} history) to Developer Agent...")
-                    code_artifact = self.developer.generate_code(task_spec, failure_trace)
+                    print(f"  → Sending FailureTrace (iteration {iteration} history) to Developer Agent...")
+                    code_artifact = self.developer.generate_code(
+                        task_spec, failure_trace, current_code=code_artifact.content
+                    )
                     next_code_file = run_dir / f"generated_code_iter{iteration + 1}.py"
                     next_code_file.write_text(code_artifact.content)
                     print(f"  \u2192 Refined code saved: {next_code_file.name}")
@@ -142,7 +163,8 @@ class RunOncePipeline:
             print(f"         \u2514 failure_trace_context.json: {len(trace_data['history'])} failure record(s)")
 
         except Exception as e:
-            print(f"Pipeline error: {e}")
+            tb_str = traceback.format_exc()
+            print(f"Pipeline error:\n{tb_str}")
             results["error"] = str(e)
 
         summary_file = run_dir / "summary.json"
