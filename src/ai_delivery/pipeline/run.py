@@ -15,8 +15,9 @@ from ai_delivery.models.failure_trace import FailureTrace, IterationRecord
 from ai_delivery.agents.orchestrator import OrchestratorAgent
 from ai_delivery.agents.developer import DeveloperAgent
 from ai_delivery.agents.tester import TesterAgent
+from ai_delivery.llm.openai_client import OpenAIClient
 
-MAX_ITERATIONS = 3
+MAX_ITERATIONS = 6
 
 
 def _extract_traceback(output: str) -> str:
@@ -56,9 +57,10 @@ class RunPipeline:
         """Initialize the pipeline."""
         self.artifacts_dir = Path(artifacts_dir)
         self.artifacts_dir.mkdir(parents=True, exist_ok=True)
-        self.orchestrator = OrchestratorAgent()
-        self.developer = DeveloperAgent()
-        self.tester = TesterAgent()
+        llm = OpenAIClient() if os.getenv("OPENAI_API_KEY") else None
+        self.orchestrator = OrchestratorAgent(llm=llm)
+        self.developer = DeveloperAgent(llm=llm)
+        self.tester = TesterAgent(llm=llm)
 
     def run(self, user_message: str) -> dict:
         """Execute the six-stage TDG loop for the given user message."""
@@ -143,7 +145,9 @@ class RunPipeline:
                 if iteration < MAX_ITERATIONS:
                     print(f"  → Sending FailureTrace (iteration {iteration} history) to Developer Agent...")
                     code_artifact = self.developer.generate_code(
-                        task_spec, failure_trace, current_code=code_artifact.content
+                        task_spec, failure_trace,
+                        current_code=code_artifact.content,
+                        test_code=test_artifact.content,
                     )
                     next_code_file = run_dir / f"generated_code_iter{iteration + 1}.py"
                     next_code_file.write_text(code_artifact.content)

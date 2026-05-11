@@ -1,17 +1,20 @@
 """Tester agent for writing and executing tests."""
 
 from typing import Optional
+from ai_delivery.llm.base import LLMClient
 from ai_delivery.models.generated_artifact import GeneratedArtifact
 from ai_delivery.models.execution_result import ExecutionResult
 from ai_delivery.models.task_spec import TaskSpec
+from ai_delivery.prompts.tester_prompts import generate_tests_prompt
 
 
 class TesterAgent:
     """Agent responsible for testing generated code."""
 
-    def __init__(self, model_name: str = "gpt-4"):
+    def __init__(self, model_name: str = "gpt-4", llm: Optional[LLMClient] = None):
         """Initialize the tester agent."""
         self.model_name = model_name
+        self.llm = llm
 
     def generate_tests(self, task_spec: TaskSpec, code: str = "") -> GeneratedArtifact:
         """Generate tests from the task specification and generated code (Stage 3).
@@ -19,6 +22,16 @@ class TesterAgent:
         Tests are generated once and remain fixed throughout the refinement loop.
         The same suite re-executes after every code change.
         """
+        if self.llm is not None:
+            result = self.llm.invoke(generate_tests_prompt(task_spec, code))
+            test_code = result.get("tests", "")
+            return GeneratedArtifact(
+                content=test_code,
+                file_type="py",
+                agent_name="tester",
+            )
+
+        # ── Stub fallback ─────────────────────────────────────────────────
         fn = task_spec.function_name
         mod = task_spec.module_name
         test_code = f"""import pytest
@@ -63,10 +76,9 @@ def test_negative_raises_error():
     def parse_failures(self, result: ExecutionResult) -> list[str]:
         """Extract failed test names from pytest stdout."""
         import re
-        failed = re.findall(r"FAILED (.+?) ", result.output)
-        if not failed:
-            failed = re.findall(r"::test_\w+", result.output)
-        return [f.strip() for f in failed]
+        # Match the short-summary section: "FAILED path/test_file.py::test_name"
+        failed = re.findall(r"FAILED\s+[^\n]*::(\w+)", result.output)
+        return list(dict.fromkeys(failed))  # deduplicate, preserve order
 
     def review_results(self, result: ExecutionResult) -> str:
         """Review test execution results and provide feedback."""

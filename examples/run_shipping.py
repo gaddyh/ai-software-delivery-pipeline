@@ -23,9 +23,12 @@ def main():
 
     # Define the task as a plain user message
     user_message = (
-        "Write a function factorial(n: int) -> int that calculates "
-        "the factorial of a number using recursion. "
-        "Handle negative inputs by raising a ValueError."
+        "Write a function calculate_shipping(cart_total: float, weight: float) -> float "
+        "that returns the shipping cost for an order. "
+        "Rules: orders over $100 get free shipping; "
+        "packages heavier than 5 kg cost $15; "
+        "all other orders cost $5. "
+        "Raise a ValueError for negative cart_total or negative weight."
     )
 
     # Initialize the pipeline

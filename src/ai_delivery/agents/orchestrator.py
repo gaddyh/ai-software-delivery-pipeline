@@ -2,26 +2,35 @@
 
 import re
 from typing import Optional
+from ai_delivery.llm.base import LLMClient
 from ai_delivery.models.task_spec import TaskSpec
 from ai_delivery.models.generated_artifact import GeneratedArtifact
 from ai_delivery.models.execution_result import ExecutionResult
+from ai_delivery.prompts.orchestrator_prompts import assign_task_prompt, TASK_SPEC_SCHEMA
 
 
 class OrchestratorAgent:
     """Orchestrates the software delivery pipeline."""
 
-    def __init__(self, model_name: str = "gpt-4"):
+    def __init__(self, model_name: str = "gpt-4", llm: Optional[LLMClient] = None):
         """Initialize the orchestrator agent."""
         self.model_name = model_name
+        self.llm = llm
 
     def assign_task(self, user_message: str) -> TaskSpec:
         """Parse a natural-language user message into a TaskSpec (Stage 1).
 
-        Stub implementation: extracts a function name via heuristic pattern
-        matching and fills remaining fields with sensible defaults derived
-        from the message text.  Replace the body with an LLM call when ready.
+        Uses the LLM when available; falls back to heuristic stub otherwise.
         """
-        # Try to extract an explicit function name from the message
+        if self.llm is not None:
+            result = self.llm.invoke(assign_task_prompt(user_message), schema=TASK_SPEC_SCHEMA)
+            return TaskSpec(
+                raw_requirement=user_message,
+                module_name="solution",
+                **result,
+            )
+
+        # ── Stub fallback ─────────────────────────────────────────────────
         fn_match = (
             re.search(r"function\s+([a-z_][a-z0-9_]*)", user_message, re.IGNORECASE)
             or re.search(r"def\s+([a-z_][a-z0-9_]*)\s*\(", user_message, re.IGNORECASE)
@@ -29,7 +38,6 @@ class OrchestratorAgent:
         )
         function_name = fn_match.group(1).lower() if fn_match else "solution"
 
-        # Derive a minimal function signature from name
         sig_match = re.search(
             r"(def\s+[a-z_][a-z0-9_]*\s*\([^)]*\)(?:\s*->\s*\S+)?)",
             user_message,
