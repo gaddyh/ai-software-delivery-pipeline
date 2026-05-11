@@ -51,6 +51,7 @@ def main():
     print(f"Run ID: {results['run_id']}")
     print(f"Task: {task_spec.description}")
     print(f"Success: {results['success']}")
+    print(f"Iterations: {results.get('iterations', 'N/A')}")
 
     if results.get("execution_result"):
         print(f"Execution Status: {results['execution_result'].status.value}")

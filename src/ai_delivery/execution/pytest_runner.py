@@ -1,5 +1,6 @@
 """Pytest runner for executing tests."""
 
+import shutil
 import subprocess
 import tempfile
 import os
@@ -29,6 +30,10 @@ class PytestRunner:
                 # Write the test file
                 test_file = Path(temp_dir) / "test_generated.py"
                 test_file.write_text(test_code)
+
+                # Copy solution module so tests can import it
+                if code_path and os.path.exists(code_path):
+                    shutil.copy(code_path, Path(temp_dir) / "solution.py")
 
                 # Run pytest
                 result = subprocess.run(
