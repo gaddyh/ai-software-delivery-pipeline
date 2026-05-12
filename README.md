@@ -629,6 +629,8 @@ The current version supports:
 
 ## MVP 1 Benchmark Results
 
+### Original MVP 1 Benchmark (Easy/Medium Tasks)
+
 Batch run executed on 2026-05-12 using the MVP 1 benchmark set (5 progressive tasks):
 
 | # | Task | Status | Iterations |
@@ -648,8 +650,23 @@ Batch run executed on 2026-05-12 using the MVP 1 benchmark set (5 progressive ta
 - Quality critic approved all implementations
 - No overfitting or suspicious patterns detected
 
-**Note:** The benchmark demonstrates the system's ability to converge or produce useful failure reports, which is the MVP 1 standard.
+### Harder MVP 1 Benchmark
 
+Batch run using the harder benchmark set (5 tasks with increased complexity):
+
+| # | Task | Status | Iterations |
+|---|------|--------|------------|
+| 1 | calculate_coupon_discount (function) | ✓ Passed | - |
+| 2 | calculate_late_fee (function) | ✗ Failed | - |
+| 3 | LoginAttemptTracker (class) | ✓ Passed | - |
+| 4 | OrderStateMachine (class) | ✓ Passed | - |
+| 5 | RoomBooking (class) | ✓ Passed | - |
+
+**Summary:** 4/5 tasks passed (80% success rate)
+
+**Known weakness:** Arithmetic composition with caps/modifiers (e.g., calculate_late_fee with tiered calculations, override rules, and caps)
+
+**Note:** Both benchmarks demonstrate the system's ability to converge or produce useful failure reports, which is the MVP 1 standard.
 ---
 
 ## License
