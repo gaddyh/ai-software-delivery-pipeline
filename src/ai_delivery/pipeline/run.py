@@ -18,7 +18,6 @@ from ai_delivery.agents.tester import TesterAgent
 from ai_delivery.agents.failure_analyzer import FailureAnalyzerAgent
 from ai_delivery.agents.critic import CodeQualityCriticAgent
 from ai_delivery.llm.openai_client import OpenAIClient
-from ai_delivery.prompts.developer_prompts import _get_repair_mode
 from ai_delivery.reporting.report_generator import ReportGenerator
 
 MAX_ITERATIONS = 6
@@ -166,20 +165,19 @@ class RunPipeline:
                 print(f"  \u2717 FAILED \u2014 {first_line}")
                 print(f"         Failed tests: {', '.join(failed_tests) if failed_tests else 'see output'}")
 
-                # Failure Analyzer: convert raw pytest output → structured patch instruction
-                print(f"  \u2192 Failure Analyzer: inferring rules from pytest output...")
+                # Failure Analyzer: extract structured per-test facts from pytest output
+                print(f"  \u2192 Failure Analyzer: extracting structured facts from pytest output...")
                 failure_analysis = self.failure_analyzer.analyze(
                     task_spec, execution_result, failed_tests
                 )
                 analysis_file = run_dir / f"failure_analysis_iter{iteration}.json"
                 analysis_file.write_text(failure_analysis.model_dump_json(indent=2))
-                print(f"         category  : {failure_analysis.failure_category} (confidence {failure_analysis.confidence:.2f})")
-                if failure_analysis.expected_value or failure_analysis.actual_value:
-                    print(f"         expected  : {failure_analysis.expected_value}")
-                    print(f"         actual    : {failure_analysis.actual_value}")
-                    print(f"         delta     : {failure_analysis.difference}")
-                print(f"         likely_bug: {failure_analysis.likely_bug}")
-                print(f"         patch: {failure_analysis.patch_instruction[:120]}")
+                print(f"         summary   : {failure_analysis.failure_summary}")
+                for sf in failure_analysis.failed_tests[:3]:
+                    detail = f"{sf.test_name} [{sf.failure_type}]"
+                    if sf.expected and sf.actual:
+                        detail += f" expected={sf.expected} actual={sf.actual}"
+                    print(f"         - {detail}")
 
                 record = IterationRecord(
                     iteration=iteration,
@@ -195,8 +193,6 @@ class RunPipeline:
                     failure_trace.history.append(record)
 
                 if iteration < MAX_ITERATIONS:
-                    repair_mode = _get_repair_mode(failure_trace, failure_analysis)
-                    print(f"  \u2192 repair_mode: {repair_mode}")
                     print(f"  \u2192 Sending FailureAnalysis + FailureTrace to Developer Agent...")
                     code_artifact = self.developer.generate_code(
                         task_spec, failure_trace,

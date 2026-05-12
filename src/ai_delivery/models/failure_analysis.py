@@ -4,63 +4,28 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
-FAILURE_CATEGORIES = (
-    "precision_rounding_error",
-    "formula_logic_error",
-    "validation_error",
-    "missing_branch_error",
-    "type_error",
-    "overfitting_suspected",
-    "unknown",
-)
+
+class StructuredTestFailure(BaseModel):
+    """Factual record of a single failing test extracted from pytest output."""
+
+    test_name: str = Field(description="Name of the failing test.")
+    failure_type: str = Field(description="Exception or failure type, e.g. 'AssertionError', 'ValueError'.")
+    expected: Optional[str] = Field(default=None, description="Expected value from the assertion, if extractable.")
+    actual: Optional[str] = Field(default=None, description="Actual value produced by the code, if extractable.")
+    error_message: str = Field(description="The assertion or error message text.")
+    trace_excerpt: str = Field(description="Relevant snippet of the stack trace for this test.")
 
 
 class FailureAnalysis(BaseModel):
-    """Distilled patch instruction derived from a set of failing pytest tests."""
+    """Structured facts extracted from a pytest run by the FailureAnalyzerAgent."""
 
-    failed_tests: list[str] = Field(
-        description="Names of the tests that failed in this iteration."
+    failed_tests: list[StructuredTestFailure] = Field(
+        description="One entry per failing test, with extracted evidence."
     )
-    inferred_rules: list[str] = Field(
+    failure_summary: str = Field(
         description=(
-            "Business rules inferred from the assertion values in the failure output. "
-            "Each entry is a plain-English statement of one rule the implementation must satisfy."
+            "Concise plain-English overview of what failed and why, "
+            "e.g. '2 tests failed. test_X expected 63.34 but got 63.34001. "
+            "test_Y raised ValueError unexpectedly.'"
         )
-    )
-    likely_bug: str = Field(
-        description="One-sentence diagnosis of the most probable defect in the current code."
-    )
-    patch_instruction: str = Field(
-        description=(
-            "Concrete, actionable instruction for the Developer Agent: what to change, "
-            "in what order, and why."
-        )
-    )
-    expected_value: Optional[str] = Field(
-        default=None,
-        description="Expected value extracted from the first failing assertion, e.g. '63.34'.",
-    )
-    actual_value: Optional[str] = Field(
-        default=None,
-        description="Actual value extracted from the first failing assertion, e.g. '63.34000000001'.",
-    )
-    difference: Optional[str] = Field(
-        default=None,
-        description="Human-readable delta between actual and expected, e.g. '~1e-11'.",
-    )
-    failure_category: str = Field(
-        default="unknown",
-        description=(
-            "Category of the failure. One of: "
-            + ", ".join(FAILURE_CATEGORIES)
-        ),
-    )
-    confidence: float = Field(
-        default=0.0,
-        ge=0.0,
-        le=1.0,
-        description=(
-            "Confidence in the failure_category classification (0.0–1.0). "
-            "Use >= 0.8 only when evidence strongly supports the category."
-        ),
     )
