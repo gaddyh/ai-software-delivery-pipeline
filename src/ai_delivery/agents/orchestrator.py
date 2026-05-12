@@ -1,5 +1,6 @@
 """Orchestrator agent for coordinating the pipeline."""
 
+import json
 import re
 from typing import Optional
 from ai_delivery.llm.base import LLMClient
@@ -24,6 +25,12 @@ class OrchestratorAgent:
         """
         if self.llm is not None:
             result = self.llm.invoke(assign_task_prompt(user_message), schema=TASK_SPEC_SCHEMA)
+            raw_rules = result.get("business_rules", "{}")
+            if isinstance(raw_rules, str):
+                try:
+                    result["business_rules"] = json.loads(raw_rules)
+                except (json.JSONDecodeError, ValueError):
+                    result["business_rules"] = {}
             return TaskSpec(
                 raw_requirement=user_message,
                 module_name="solution",

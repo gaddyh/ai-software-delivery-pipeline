@@ -5,6 +5,8 @@ from ai_delivery.llm.base import LLMClient
 from ai_delivery.models.task_spec import TaskSpec
 from ai_delivery.models.generated_artifact import GeneratedArtifact
 from ai_delivery.models.failure_trace import FailureTrace
+from ai_delivery.models.failure_analysis import FailureAnalysis
+from ai_delivery.models.quality_report import QualityReport
 from ai_delivery.prompts.developer_prompts import initial_code_prompt, refine_code_prompt
 
 
@@ -22,6 +24,8 @@ class DeveloperAgent:
         failure_trace: Optional[FailureTrace] = None,
         current_code: str = "",
         test_code: str = "",
+        failure_analysis: Optional[FailureAnalysis] = None,
+        quality_report: Optional[QualityReport] = None,
     ) -> GeneratedArtifact:
         """Generate code for the task.
 
@@ -35,10 +39,17 @@ class DeveloperAgent:
         iteration = len(failure_trace.history) + 1 if failure_trace else 1
 
         if self.llm is not None:
-            if failure_trace is None:
+            if failure_trace is None and quality_report is None:
                 result = self.llm.invoke(initial_code_prompt(task_spec))
             else:
-                result = self.llm.invoke(refine_code_prompt(task_spec, current_code, failure_trace, test_code))
+                ft = failure_trace if failure_trace is not None else FailureTrace(history=[])
+                result = self.llm.invoke(
+                    refine_code_prompt(
+                        task_spec, current_code, ft, test_code,
+                        analysis=failure_analysis,
+                        quality_report=quality_report,
+                    )
+                )
             code = result.get("code", "")
             return GeneratedArtifact(
                 content=code,

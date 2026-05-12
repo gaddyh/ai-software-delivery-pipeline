@@ -2,6 +2,7 @@
 
 import json
 import os
+import time
 
 from openai import OpenAI
 
@@ -57,20 +58,23 @@ class OpenAIClient(LLMClient):
         else:
             response_format = {"type": "json_object"}
 
-        response = self._client.chat.completions.create(
-            model=self.model,
-            messages=[
-                {"role": "system", "content": _SYSTEM_DEFAULT},
-                {"role": "user", "content": prompt},
-            ],
-            response_format=response_format,
-        )
-
-        content = response.choices[0].message.content
-        if content is None:
-            refusal = getattr(response.choices[0].message, "refusal", None)
-            raise ValueError(
-                f"OpenAI returned no content (possible refusal). "
-                f"Refusal message: {refusal!r}"
+        last_refusal: str | None = None
+        for attempt in range(1, 4):
+            response = self._client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": _SYSTEM_DEFAULT},
+                    {"role": "user", "content": prompt},
+                ],
+                response_format=response_format,
             )
-        return json.loads(content)
+            content = response.choices[0].message.content
+            if content is not None:
+                return json.loads(content)
+            last_refusal = getattr(response.choices[0].message, "refusal", None)
+            if attempt < 3:
+                time.sleep(1)
+        raise ValueError(
+            f"OpenAI returned no content after 3 attempts (possible refusal). "
+            f"Last refusal message: {last_refusal!r}"
+        )

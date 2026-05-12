@@ -21,14 +21,35 @@ def main():
     if not os.getenv("OPENAI_API_KEY"):
         print("Warning: OPENAI_API_KEY not set. Using placeholder implementation.")
 
-    # Define the task as a plain user message
     user_message = (
-        "Write a function calculate_shipping(cart_total: float, weight: float) -> float "
-        "that returns the shipping cost for an order. "
-        "Rules: orders over $100 get free shipping; "
-        "packages heavier than 5 kg cost $15; "
-        "all other orders cost $5. "
-        "Raise a ValueError for negative cart_total or negative weight."
+        "Hey, I need a Python function for our checkout service. "
+        "The function should be called calculate_shipping and take three arguments: "
+        "cart_total as a float, package_weight as a float, and destination_zone as a string. "
+        "Return the final shipping cost as a float. "
+        ""
+        "Here are the rules. If cart_total is greater than $150, shipping is free, no matter "
+        "how heavy the package is or where it is going. "
+        ""
+        "If the cart total is $150 or less, calculate shipping by weight first: "
+        "packages up to and including 2 kg cost $5, packages over 2 kg and up to and including "
+        "5 kg cost $10, and packages over 5 kg cost $18. "
+        ""
+        "Then apply a destination surcharge. For destination_zone='local', add $0. "
+        "For destination_zone='regional', add $4. "
+        "For destination_zone='international', add $12. "
+        ""
+        "There is one special rule: international packages over 10 kg are not allowed, "
+        "so raise a ValueError in that case. "
+        ""
+        "Also raise a ValueError if cart_total is negative, package_weight is negative, "
+        "or destination_zone is not one of: local, regional, international. "
+        ""
+        "Important boundary cases: cart_total exactly 150 is not free shipping. "
+        "package_weight exactly 2 kg uses the $5 tier. "
+        "package_weight exactly 5 kg uses the $10 tier. "
+        "package_weight exactly 10 kg is still allowed for international shipping. "
+        ""
+        "Round the returned shipping cost to two decimal places."
     )
 
     # Initialize the pipeline

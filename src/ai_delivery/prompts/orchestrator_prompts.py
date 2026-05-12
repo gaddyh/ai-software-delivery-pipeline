@@ -14,6 +14,14 @@ def assign_task_prompt(user_message: str) -> str:
         "  - constraints: list of implementation constraints (may be empty)\n"
         "  - success_criteria: list of measurable acceptance criteria\n"
         "  - edge_cases: list of edge cases that must be handled\n"
+        "  - business_rules: a JSON-encoded string capturing ALL explicit numeric thresholds, "
+        "pricing tiers, zone/category surcharges, and validation rules with exact values. "
+        "Include every number mentioned in the requirement. "
+        'Example value (as a JSON string): \'{"free_shipping_threshold": 150, '
+        '"weight_tiers": [{"max_kg": 2, "cost": 5.0}, {"max_kg": 5, "cost": 10.0}, {"min_kg": 5, "cost": 18.0}], '
+        '"zone_surcharges": {"local": 0.0, "regional": 4.0, "international": 12.0}, '
+        '"invalid_rules": ["negative cart_total raises ValueError"]}\'. '
+        "Do not invent values not present in the requirement.\n"
     )
 
 
@@ -35,6 +43,7 @@ TASK_SPEC_SCHEMA: dict = {
             "type": "array",
             "items": {"type": "string"},
         },
+        "business_rules": {"type": "string"},
     },
     "required": [
         "function_name",
@@ -43,6 +52,7 @@ TASK_SPEC_SCHEMA: dict = {
         "constraints",
         "success_criteria",
         "edge_cases",
+        "business_rules",
     ],
     "additionalProperties": False,
 }

@@ -10,3 +10,10 @@ class TaskSpec(BaseModel):
     constraints: list[str] = Field(default_factory=list)
     success_criteria: list[str] = Field(default_factory=list)
     edge_cases: list[str] = Field(default_factory=list)
+    business_rules: dict = Field(
+        default_factory=dict,
+        description=(
+            "Structured business rules extracted from the requirement: "
+            "pricing tiers, thresholds, surcharges, and validation rules with exact values."
+        ),
+    )

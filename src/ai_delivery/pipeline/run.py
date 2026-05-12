@@ -15,6 +15,8 @@ from ai_delivery.models.failure_trace import FailureTrace, IterationRecord
 from ai_delivery.agents.orchestrator import OrchestratorAgent
 from ai_delivery.agents.developer import DeveloperAgent
 from ai_delivery.agents.tester import TesterAgent
+from ai_delivery.agents.failure_analyzer import FailureAnalyzerAgent
+from ai_delivery.agents.critic import CodeQualityCriticAgent
 from ai_delivery.llm.openai_client import OpenAIClient
 
 MAX_ITERATIONS = 6
@@ -61,6 +63,8 @@ class RunPipeline:
         self.orchestrator = OrchestratorAgent(llm=llm)
         self.developer = DeveloperAgent(llm=llm)
         self.tester = TesterAgent(llm=llm)
+        self.failure_analyzer = FailureAnalyzerAgent(llm=llm)
+        self.critic = CodeQualityCriticAgent(llm=llm)
 
     def run(self, user_message: str) -> dict:
         """Execute the six-stage TDG loop for the given user message."""
@@ -120,7 +124,36 @@ class RunPipeline:
 
                 if execution_result.status.value == "success":
                     print(f"  \u2713 PASSED \u2014 all tests green")
-                    break
+
+                    # Stage 5b: Code Quality Critic
+                    print(f"  \u2192 Code Quality Critic: reviewing for overfitting...")
+                    quality_report = self.critic.review(
+                        task_spec, current_code_file.read_text()
+                    )
+                    quality_file = run_dir / f"quality_report_iter{iteration}.json"
+                    quality_file.write_text(quality_report.model_dump_json(indent=2))
+
+                    if quality_report.passed:
+                        print(f"  \u2713 QUALITY OK \u2014 {quality_report.summary}")
+                        break
+
+                    print(f"  \u2717 QUALITY FAIL \u2014 {quality_report.summary}")
+                    for flag in quality_report.flags:
+                        print(f"         - {flag[:120]}")
+
+                    if iteration < MAX_ITERATIONS:
+                        print(f"  \u2192 Sending QualityReport to Developer Agent for clean rewrite...")
+                        code_artifact = self.developer.generate_code(
+                            task_spec, failure_trace,
+                            current_code=current_code_file.read_text(),
+                            test_code=test_artifact.content,
+                            failure_analysis=None,
+                            quality_report=quality_report,
+                        )
+                        next_code_file = run_dir / f"generated_code_iter{iteration + 1}.py"
+                        next_code_file.write_text(code_artifact.content)
+                        print(f"  \u2192 Rewritten code saved: {next_code_file.name}")
+                    continue
 
                 # Stage 5: parse failures, build FailureTrace, refine code
                 failed_tests = self.tester.parse_failures(execution_result)
@@ -128,6 +161,16 @@ class RunPipeline:
                 first_line = feedback.splitlines()[0][:120] if feedback else ""
                 print(f"  \u2717 FAILED \u2014 {first_line}")
                 print(f"         Failed tests: {', '.join(failed_tests) if failed_tests else 'see output'}")
+
+                # Failure Analyzer: convert raw pytest output → structured patch instruction
+                print(f"  \u2192 Failure Analyzer: inferring rules from pytest output...")
+                failure_analysis = self.failure_analyzer.analyze(
+                    task_spec, execution_result, failed_tests
+                )
+                analysis_file = run_dir / f"failure_analysis_iter{iteration}.json"
+                analysis_file.write_text(failure_analysis.model_dump_json(indent=2))
+                print(f"         likely_bug: {failure_analysis.likely_bug}")
+                print(f"         patch: {failure_analysis.patch_instruction[:120]}")
 
                 record = IterationRecord(
                     iteration=iteration,
@@ -143,11 +186,12 @@ class RunPipeline:
                     failure_trace.history.append(record)
 
                 if iteration < MAX_ITERATIONS:
-                    print(f"  → Sending FailureTrace (iteration {iteration} history) to Developer Agent...")
+                    print(f"  \u2192 Sending FailureAnalysis + FailureTrace to Developer Agent...")
                     code_artifact = self.developer.generate_code(
                         task_spec, failure_trace,
                         current_code=code_artifact.content,
                         test_code=test_artifact.content,
+                        failure_analysis=failure_analysis,
                     )
                     next_code_file = run_dir / f"generated_code_iter{iteration + 1}.py"
                     next_code_file.write_text(code_artifact.content)
