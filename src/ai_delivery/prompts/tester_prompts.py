@@ -7,6 +7,8 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from ai_delivery.models.task_spec import TaskSpec
 
+from ai_delivery.prompts.task_context import format_task_context
+
 
 def _format_rules(business_rules: list) -> str:
     """Format a list of BusinessRule instances (or dicts) as 'name: rule' lines."""
@@ -38,12 +40,19 @@ def generate_tests_prompt(task_spec: "TaskSpec", code: str = "") -> str:
         if task_spec.business_rules
         else ""
     )
+    import_instruction = (
+        f"from {task_spec.module_name} import {task_spec.class_name}\n"
+        f"Instantiate {task_spec.class_name}() and test all public behavior through its methods. "
+        "Do not test private implementation details."
+        if task_spec.is_class_task
+        else f"from {task_spec.module_name} import the function and call it directly."
+    )
     return (
         "You are an expert Python test engineer. "
         "Write a pytest test suite grounded in the business rules below.\n\n"
-        f"Task: {task_spec.description}\n"
-        f"Function signature: {task_spec.function_signature}\n"
-        f"Module to import from: {task_spec.module_name}\n\n"
+        f"Task: {task_spec.description}\n\n"
+        f"{format_task_context(task_spec)}\n\n"
+        f"Import instructions: {import_instruction}\n\n"
         f"{business_rules_section}"
         f"Success criteria:\n{success_criteria}\n\n"
         f"Edge cases to cover:\n{edge_cases}\n\n"

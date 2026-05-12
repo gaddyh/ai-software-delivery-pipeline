@@ -35,7 +35,6 @@ class DeveloperAgent:
         implementation informed by prior test failures, the current code
         version, and the complete pytest output stored in the trace.
         """
-        fn = task_spec.function_name
         iteration = len(failure_trace.history) + 1 if failure_trace else 1
 
         if self.llm is not None:
@@ -59,30 +58,18 @@ class DeveloperAgent:
             )
 
         # ── Stub fallback ─────────────────────────────────────────────────
-        if failure_trace is None:
+        label = task_spec.class_name or (
+            task_spec.methods[0].split("(")[0] if task_spec.methods else "solution"
+        )
+        if task_spec.is_class_task:
             code = (
-                f'""";\nGenerated code for: {task_spec.description}\n'
-                f'(iteration {iteration} — stub)\n"""\n\n\n'
-                f'def main():\n    """Main entry point."""\n'
-                f'    print("Hello, World!")\n\n\n'
-                f'if __name__ == "__main__":\n    main()\n'
+                f'"""Generated stub for: {task_spec.description} (iteration {iteration})"""\n\n\n'
+                f'class {label}:\n    pass\n'
             )
         else:
             code = (
-                f'""";\nGenerated code for: {task_spec.description}\n'
-                f'(iteration {iteration} — refined after {len(failure_trace.history)} failure(s))\n"""\n\n\n'
-                f'def {fn}(n: int) -> int:\n'
-                f'    """Calculate {fn} of n.\n\n'
-                f'    Args:\n        n: A non-negative integer.\n\n'
-                f'    Returns:\n        The {fn} of n.\n\n'
-                f'    Raises:\n        ValueError: If n is negative.\n    """\n'
-                f'    if n < 0:\n'
-                f'        raise ValueError(f"{fn}() not defined for negative values, got {{n}}")\n'
-                f'    if n == 0:\n        return 1\n'
-                f'    return n * {fn}(n - 1)\n\n\n'
-                f'def main():\n    """Main entry point."""\n'
-                f'    print({fn}(5))\n\n\n'
-                f'if __name__ == "__main__":\n    main()\n'
+                f'"""Generated stub for: {task_spec.description} (iteration {iteration})"""\n\n\n'
+                f'def {label}(*args, **kwargs):\n    pass\n'
             )
 
         return GeneratedArtifact(

@@ -39,6 +39,41 @@ class ReportGenerator:
             f"| **Task** | {summary.get('task_description', '—')} |\n"
         )
 
+        # ── Task Spec (class/function + methods) ─────────────────────────────
+        class_name = task_spec_data.get("class_name", "")
+        methods = task_spec_data.get("methods", [])
+        if class_name or methods:
+            sections.append("\n## Task Spec\n")
+            if class_name:
+                sections.append(
+                    f"| Field | Value |\n"
+                    f"|-------|-------|\n"
+                    f"| **Type** | Class |\n"
+                    f"| **Class** | `{class_name}` |\n"
+                    f"| **Module** | `{task_spec_data.get('module_name', 'solution')}` |\n"
+                )
+                if methods:
+                    sections.append("\n**Methods:**\n")
+                    sections.append("| Signature |")
+                    sections.append("|-----------|")
+                    for m in methods:
+                        sections.append(f"| `{m}` |")
+                    sections.append("")
+            else:
+                sections.append(
+                    f"| Field | Value |\n"
+                    f"|-------|-------|\n"
+                    f"| **Type** | Module functions |\n"
+                    f"| **Module** | `{task_spec_data.get('module_name', 'solution')}` |\n"
+                )
+                if methods:
+                    sections.append("\n**Functions:**\n")
+                    sections.append("| Signature |")
+                    sections.append("|-----------|")
+                    for m in methods:
+                        sections.append(f"| `{m}` |")
+                    sections.append("")
+
         # ── Business Rules (from task_spec if saved) ──────────────────────────
         business_rules = task_spec_data.get("business_rules", [])
         if business_rules:

@@ -10,8 +10,15 @@ class BusinessRule(BaseModel):
 
 class TaskSpec(BaseModel):
     raw_requirement: str
-    function_name: str
-    function_signature: str
+    class_name: str = ""
+    methods: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Public callable signatures without 'def'. "
+            "For class tasks: method signatures. "
+            "For module-level function tasks: function signatures."
+        ),
+    )
     module_name: str = "solution"
     description: str
     constraints: list[str] = Field(default_factory=list)
@@ -24,3 +31,8 @@ class TaskSpec(BaseModel):
             "each encoding one precise condition with exact numeric values."
         ),
     )
+
+    @property
+    def is_class_task(self) -> bool:
+        """True when the artifact is a class rather than module-level function(s)."""
+        return bool(self.class_name.strip())

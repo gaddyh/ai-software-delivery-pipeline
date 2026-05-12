@@ -92,6 +92,7 @@ ai-software-delivery-pipeline/
 ├── .env.example
 ├── examples/
 │   ├── run_shipping.py
+│   ├── run_shopping_cart.py
 │   └── generate_report.py
 ├── artifacts/
 │   └── runs/
@@ -121,6 +122,7 @@ ai-software-delivery-pipeline/
 │       │   ├── failure_analyzer.py
 │       │   └── critic.py
 │       ├── prompts/
+│       │   ├── task_context.py
 │       │   ├── orchestrator_prompts.py
 │       │   ├── tester_prompts.py
 │       │   ├── developer_prompts.py
@@ -158,11 +160,27 @@ cp .env.example .env
 
 ## Usage
 
-Run the shipping pipeline:
+### Example 1 — module-level function
+
+`run_shipping.py` generates a `calculate_shipping` function from a detailed natural-language spec:
 
 ```bash
 python3 examples/run_shipping.py
 ```
+
+The orchestrator sets `class_name=""` and puts the function signature in `methods`. The tester imports and calls the function directly.
+
+### Example 2 — class artifact
+
+`run_shopping_cart.py` generates a `ShoppingCart` class from a loose natural-language requirement:
+
+```bash
+python3 examples/run_shopping_cart.py
+```
+
+The orchestrator sets `class_name="ShoppingCart"` and populates `methods` with the public API. The tester instantiates the class and tests behavior through its methods.
+
+### Report generation
 
 Generate or regenerate a report for the latest run:
 
@@ -190,23 +208,38 @@ artifacts/runs/{run_id}/
 
 The structured interpretation of the user requirement.
 
-Example business-rule format:
+For a class artifact:
 
 ```json
-"business_rules": [
-  {
-    "name": "Free shipping",
-    "rule": "cart_total > 150.0 → return 0.0"
-  },
-  {
-    "name": "Weight tier 1",
-    "rule": "package_weight <= 2.0 → base cost 5.0"
-  },
-  {
-    "name": "Regional surcharge",
-    "rule": "destination_zone == 'regional' → add 4.0"
-  }
-]
+{
+  "class_name": "ShoppingCart",
+  "methods": [
+    "add_item(item_name: str, price: float, quantity: int = 1) -> None",
+    "remove_item(item_name: str, quantity: int | None = None) -> None",
+    "subtotal() -> float",
+    "apply_coupon(discount_amount: float) -> None",
+    "total() -> float"
+  ],
+  "business_rules": [
+    { "name": "Negative price", "rule": "price < 0.0 → raise ValueError" },
+    { "name": "Item merging", "rule": "item_name in cart → increase quantity" },
+    { "name": "Total floor", "rule": "total < 0.0 → return 0.0" }
+  ]
+}
+```
+
+For a module-level function artifact, `class_name` is `""` and `methods` contains the function signature:
+
+```json
+{
+  "class_name": "",
+  "methods": ["calculate_shipping(cart_total: float, package_weight: float, destination_zone: str) -> float"],
+  "business_rules": [
+    { "name": "Free shipping", "rule": "cart_total > 150.0 → return 0.0" },
+    { "name": "Weight tier 1", "rule": "package_weight <= 2.0 → base cost 5.0" },
+    { "name": "Regional surcharge", "rule": "destination_zone == 'regional' → add 4.0" }
+  ]
+}
 ```
 
 ### `test_suite.py`
@@ -263,16 +296,15 @@ A human-readable report generated from the run artifacts.
 
 Converts the raw user request into a structured `TaskSpec`.
 
-The task spec includes:
+The task spec describes the artifact's public API:
 
-- raw requirement
-- function name
-- function signature
-- module name
-- description
-- success criteria
-- edge cases
-- named business rules
+- `class_name` — the class name, or `""` for a module-level function task
+- `methods` — list of public callable signatures without `def`; method signatures for classes, function signatures for function tasks
+- `module_name` — the Python module to generate
+- `description` — one-sentence description
+- `success_criteria` — measurable acceptance criteria
+- `edge_cases` — edge cases to handle
+- `business_rules` — named rules with precise conditions
 
 The Orchestrator is responsible for turning vague user language into a clear behavioral contract.
 
@@ -286,14 +318,23 @@ The Tester Agent runs once per task.
 
 It should not depend on generated implementation code. Its job is to encode expected behavior from the task specification.
 
-Good tests should be rule-specific:
+Good tests should be rule-specific. For a function task:
 
 ```python
 def test_cart_total_over_150_returns_free_shipping():
     assert calculate_shipping(151.0, 5.0, "local") == 0.0
 ```
 
-This makes failure analysis easier because each failing test points to a specific violated rule.
+For a class task:
+
+```python
+def test_negative_price_raises_value_error():
+    cart = ShoppingCart()
+    with pytest.raises(ValueError):
+        cart.add_item("apple", -1.0)
+```
+
+Each failing test points to a specific violated rule, making failure analysis easier.
 
 ---
 
@@ -562,15 +603,17 @@ Project 1 MVP is working.
 The current version supports:
 
 - raw user requirement input
-- structured task specification
+- structured task specification with public API (`class_name` + `methods`)
+- class artifacts and module-level function artifacts
 - named business rules
-- test generation
+- test generation grounded on the public API
 - code generation
 - pytest execution
 - failure analysis
 - iterative refinement
-- quality criticism
-- run report generation
+- quality criticism with class-specific checks
+- run report with Task Spec section (type, class, methods table)
+- two working examples: `run_shipping.py` and `run_shopping_cart.py`
 
 ---
 

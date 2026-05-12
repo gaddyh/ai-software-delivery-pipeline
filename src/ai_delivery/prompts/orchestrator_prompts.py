@@ -8,12 +8,17 @@ def assign_task_prompt(user_message: str) -> str:
         "Parse the following requirement into a structured task specification.\n\n"
         f"Requirement:\n{user_message}\n\n"
         "Return a JSON object with exactly these fields:\n"
-        "  - function_name: snake_case name of the primary function to implement\n"
-        "  - function_signature: full Python signature e.g. 'def foo(x: int) -> int'\n"
-        "  - description: one-sentence description of what the function does\n"
+        "  - class_name: the class name if the requirement asks for a class (e.g. 'ShoppingCart'); "
+        "empty string '' if it is a module-level function task\n"
+        "  - methods: list of public callable signatures WITHOUT the 'def' keyword. "
+        "For a class, list every public method. "
+        "For a function task, list the function signature. "
+        "Example method: 'add_item(item_name: str, price: float, quantity: int = 1) -> None'\n"
+        "  - description: one-sentence description of what the code artifact does\n"
         "  - constraints: list of implementation constraints (may be empty)\n"
         "  - success_criteria: list of measurable acceptance criteria\n"
         "  - edge_cases: list of edge cases that must be handled\n"
+        "  - module_name: always 'solution'\n"
         "  - business_rules: a JSON-encoded string containing a LIST of objects, "
         "one per distinct business rule or validation constraint. "
         "Each object has exactly two keys: "
@@ -35,8 +40,11 @@ def assign_task_prompt(user_message: str) -> str:
 TASK_SPEC_SCHEMA: dict = {
     "type": "object",
     "properties": {
-        "function_name": {"type": "string"},
-        "function_signature": {"type": "string"},
+        "class_name": {"type": "string"},
+        "methods": {
+            "type": "array",
+            "items": {"type": "string"},
+        },
         "description": {"type": "string"},
         "constraints": {
             "type": "array",
@@ -51,15 +59,17 @@ TASK_SPEC_SCHEMA: dict = {
             "items": {"type": "string"},
         },
         "business_rules": {"type": "string"},
+        "module_name": {"type": "string"},
     },
     "required": [
-        "function_name",
-        "function_signature",
+        "class_name",
+        "methods",
         "description",
         "constraints",
         "success_criteria",
         "edge_cases",
         "business_rules",
+        "module_name",
     ],
     "additionalProperties": False,
 }

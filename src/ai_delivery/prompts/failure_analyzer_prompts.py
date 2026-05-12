@@ -7,6 +7,8 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from ai_delivery.models.task_spec import TaskSpec
 
+from ai_delivery.prompts.task_context import format_task_context
+
 
 FAILURE_ANALYSIS_SCHEMA: dict = {
     "type": "object",
@@ -51,7 +53,7 @@ def analyze_failures_prompt(
     return (
         "You are a senior software engineer analysing failing tests.\n\n"
         f"Task the code is supposed to implement:\n  {task_spec.description}\n\n"
-        f"Function signature:\n  {task_spec.function_signature}\n\n"
+        f"{format_task_context(task_spec)}\n\n"
         f"Failed tests:\n{failed_list}\n\n"
         "--- PYTEST OUTPUT ---\n"
         f"{pytest_output}\n"

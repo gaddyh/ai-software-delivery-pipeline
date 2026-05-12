@@ -32,31 +32,26 @@ class TesterAgent:
             )
 
         # ── Stub fallback ─────────────────────────────────────────────────
-        fn = task_spec.function_name
         mod = task_spec.module_name
-        test_code = f"""import pytest
+        if task_spec.is_class_task:
+            cls = task_spec.class_name
+            test_code = f"""import pytest
+from {mod} import {cls}
+
+
+def test_{cls.lower()}_instantiates():
+    obj = {cls}()
+    assert obj is not None
+"""
+        else:
+            fn = task_spec.methods[0].split("(")[0] if task_spec.methods else "solution_function"
+            test_code = f"""import pytest
 from {mod} import {fn}
 
 
-def test_{fn}_of_zero():
-    assert {fn}(0) == 1
-
-
-def test_{fn}_of_one():
-    assert {fn}(1) == 1
-
-
-def test_{fn}_of_five():
-    assert {fn}(5) == 120
-
-
-def test_{fn}_of_ten():
-    assert {fn}(10) == 3628800
-
-
-def test_negative_raises_error():
-    with pytest.raises(ValueError):
-        {fn}(-1)
+def test_{fn}_returns_value():
+    result = {fn}()
+    assert result is not None
 """
         return GeneratedArtifact(
             content=test_code,
