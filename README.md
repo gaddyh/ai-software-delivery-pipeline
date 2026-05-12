@@ -656,15 +656,15 @@ Batch run using the harder benchmark set (5 tasks with increased complexity):
 
 | # | Task | Status | Iterations |
 |---|------|--------|------------|
-| 1 | calculate_coupon_discount (function) | ✓ Passed | - |
-| 2 | calculate_late_fee (function) | ✗ Failed | - |
-| 3 | LoginAttemptTracker (class) | ✓ Passed | - |
-| 4 | OrderStateMachine (class) | ✓ Passed | - |
-| 5 | RoomBooking (class) | ✓ Passed | - |
+| 1 | calculate_coupon_discount | ✗ Failed | 6 |
+| 2 | calculate_late_fee | ✓ Passed | 2 |
+| 3 | LoginAttemptTracker | ✓ Passed | 1 |
+| 4 | OrderStateMachine | ✓ Passed | 1 |
+| 5 | RoomBooking | ✓ Passed | 2 |
 
 **Summary:** 4/5 tasks passed (80% success rate)
 
-**Known weakness:** Arithmetic composition with caps/modifiers (e.g., calculate_late_fee with tiered calculations, override rules, and caps)
+**Known weakness:** Arithmetic composition with caps/modifiers (e.g., calculate_coupon_discount with tiered calculations, override rules, and caps)
 
 **Note:** Both benchmarks demonstrate the system's ability to converge or produce useful failure reports, which is the MVP 1 standard.
 ---
