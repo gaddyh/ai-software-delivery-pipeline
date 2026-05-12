@@ -1,85 +1,380 @@
 # AI Software Delivery Pipeline
 
-An MVP prototype for artifact-based, evaluation-driven code generation and repair on small Python function and class tasks.
+Evaluation-driven system for reliable Python code generation and repair.
 
-The system is not a chatbot demo. It is an artifact-based software generation loop:
+The system converts a natural language software requirement into executable artifacts:
+
+```text
+Requirement
+→ Structured Spec
+→ Pytest Suite
+→ Generated Code
+→ Real Execution
+→ Failure Analysis
+→ Iterative Repair
+→ Quality Critique
+→ Engineering Report
+```
+
+The system uses executable pytest feedback, structured failure analysis, and iterative repair loops to improve generated code reliability over multiple iterations.
+
+Unlike one-shot code generation demos, this project uses executable validation loops grounded in real pytest output.
+
+---
+
+[Benchmark](#benchmark-results) · [Architecture](#architecture) · [Walkthrough](#example-walkthrough) · [What This Proves](#what-this-project-proves) · [Known Limitations](#known-limitations) · [Future Work](#planned-improvements)
+
+---
+
+## Why This Matters
+
+LLM-generated code is probabilistic.
+
+Execution results are factual.
+
+This project explores how executable feedback loops can make AI software systems more reliable by grounding refinement in real pytest execution instead of relying solely on probabilistic self-correction.
+
+---
+
+## Design Principles
+
+- Artifacts over conversations
+- Execution over self-reflection
+- Fixed tests during repair loops
+- Explicit failure analysis
+- Observable iteration history
+- Quality gates after passing tests
+
+---
+
+## Benchmark Results
+
+### MVP Benchmark Suite A
+
+Batch run executed on 2026-05-12 using 5 progressive tasks:
+
+| # | Task | Status | Iterations |
+|---|------|--------|------------|
+| 1 | apply_discount (function) | ✓ Passed | 2 |
+| 2 | calculate_ticket_price (function) | ✓ Passed | 1 |
+| 3 | BankAccount (class) | ✓ Passed | 1 |
+| 4 | Inventory (class) | ✓ Passed | 1 |
+| 5 | GradeBook (class) | ✓ Passed | 1 |
+
+**100% task convergence (5/5)**
+
+| Metric | Value |
+|--------|-------|
+| Tasks | 5 |
+| Convergence Rate | 100% |
+| First-pass Success | 80% |
+| Avg Iterations | 1.2 |
+| Avg Repair Iterations | 0.2 |
+| Critic Rejections | 0 |
+
+### MVP Benchmark Suite B
+
+Batch run using 5 tasks with increased complexity, recorded before the failure-analysis and repair-mode improvements:
+
+| # | Task | Status | Iterations |
+|---|------|--------|------------|
+| 1 | calculate_coupon_discount | ✗ Failed | 6 |
+| 2 | calculate_late_fee | ✓ Passed | 2 |
+| 3 | LoginAttemptTracker | ✓ Passed | 1 |
+| 4 | OrderStateMachine | ✓ Passed | 1 |
+| 5 | RoomBooking | ✓ Passed | 2 |
+
+**80% task convergence (4/5)** — pre-repair-mode upgrade
+
+**Known weakness at the time:** Arithmetic composition with caps/modifiers (tiered calculations, override rules, caps). The failure analyzer was inferring failure category from test names rather than reading assertion evidence, and the developer was allowed to drift into business-rule changes on precision failures.
+
+**Status:** This result predates the Phase 1 repair-mode upgrade (failure category extraction, `_get_repair_mode()`, PRECISION/FORCED_PRECISION repair modes). Suite B should be rerun against the updated codebase before treating this as a current result.
+
+### Failure Categories Observed
+
+- Floating-point precision edge cases
+- Rule-ordering mistakes (tier/modifier application sequence)
+- String-constant inconsistencies (spelling variants)
+- Missing edge-case validation
+- Incorrect state transitions
+
+These failure categories emerged from real execution traces during iterative refinement and were later used to improve repair-mode behavior.
+
+---
+
+## Architecture
 
 ```text
 User Requirement
-→ Structured Task Spec
-→ Fixed Test Suite
-→ Initial Code
-→ Pytest Execution
-→ Failure Analysis
-→ Code Refinement
-→ Quality Critic
-→ Run Report
+      ↓
+Orchestrator Agent → TaskSpec
+      ↓
+Tester Agent → Fixed Pytest Suite
+      ↓
+Developer Agent → Initial Code
+      ↓
+Pytest Runner
+  ↓ (fail)               ↓ (pass)
+Failure Analyzer    Quality Critic → Run Report
+      ↓                   ↑
+Developer Agent (repair) ─┘
 ```
 
-The core idea is simple:
-
-> Tests become executable behavioral specifications, and real tool output drives refinement.
-
----
-
-## Project Goal
-
-This project explores a practical pattern for reliable code-generation agents.
-
-Instead of asking an LLM to generate code once and hoping it works, the system:
-
-1. Interprets a user requirement.
-2. Converts it into a structured task specification.
-3. Generates a fixed pytest test suite from that spec.
-4. Generates implementation code.
-5. Runs the tests.
-6. Sends failure traces and failure analysis back to the developer agent.
-7. Refines the code until tests pass.
-8. Runs a quality critic to detect overfitting or suspicious implementation logic.
-9. Writes a full run report.
-
----
-
-## Current Pipeline Flow
-
-```text
-1. User Message
-   ↓
-2. Orchestrator Agent
-   Produces structured TaskSpec
-   ↓
-3. Tester Agent
-   Produces a fixed pytest suite from the TaskSpec
-   ↓
-4. Developer Agent
-   Produces initial implementation
-   ↓
-5. Pytest Runner
-   Executes tests in a temporary local pytest workspace
-   ↓
-6. Failure Analyzer
-   Converts pytest output into likely bug + patch instruction
-   ↓
-7. Developer Agent
-   Refines code using failure trace + failure analysis
-   ↓
-8. Repeat execution/refinement until tests pass or max iterations reached
-   ↓
-9. Code Quality Critic
-   Reviews passing code for overfitting or rule violations
-   ↓
-10. Run Report Generator
-    Writes run_report.md
-```
-
-Important rule:
+The Tester Agent runs once per task. The test suite remains fixed during all repair iterations.
 
 ```text
 Code failed → return to Developer Agent
 Spec changed → regenerate tests with Tester Agent
 ```
 
-The Tester Agent runs once per task. During refinement, the same fixed test suite is reused.
+---
+
+## What This Project Proves
+
+| Skill | How it's implemented |
+|-------|----------------------|
+| Structured output modeling | Pydantic models for TaskSpec, ExecutionResult, FailureAnalysis, QualityReport |
+| Agent role separation | Distinct orchestrator, tester, developer, failure analyzer, and critic agents |
+| Test-driven code generation | Fixed pytest suite generated from spec before any code is written |
+| Iterative repair loops | Developer agent refines code from failure traces, up to N iterations |
+| Failure trace analysis | Structured diagnosis of pytest output before re-prompting |
+| Quality gating | Critic reviews passing code for overfitting and rule violations |
+| Artifact-based engineering | Every run produces inspectable JSON and Python file artifacts |
+| Run-level observability | Full iteration history and engineering report per run |
+| Evaluation-driven development | Benchmark suite with convergence metrics across task categories |
+
+---
+
+## Run Artifacts
+
+Each execution produces a versioned artifact directory under `artifacts/runs/{run_id}/`:
+
+- Structured task specification (`task_spec.json`)
+- Generated pytest suite (`test_suite.py`)
+- Generated implementation per iteration (`generated_code_iterN.py`)
+- Execution traces per iteration (`execution_result_iterN.json`)
+- Failure analyses per iteration (`failure_analysis_iterN.json`)
+- Quality reports after passing iterations (`quality_report_iterN.json`)
+- Final engineering report (`run_report.md`)
+
+---
+
+## Screenshots
+
+![Benchmark run](assets/screenshots/benchmark_run.png)
+![Artifact folder](assets/screenshots/artifact_folder.png)
+![Run report](assets/screenshots/run_report.png)
+
+*Screenshots from run `20260512_115150`.*
+
+---
+
+## Example Walkthrough
+
+**Task:** `OrderStateMachine` — 2 iterations, 1 subtle failure, clean repair
+
+All content below is verbatim from run `20260512_115150`. Nothing is paraphrased or constructed.
+
+---
+
+### Step 1 — Raw Requirement
+
+```text
+Create an OrderStateMachine class for an ecommerce demo. It should support
+create_order(order_id: str) -> None, pay(order_id: str) -> None,
+ship(order_id: str) -> None, cancel(order_id: str) -> None,
+get_status(order_id: str) -> str, and list_orders_by_status(status: str) -> list[str].
+New orders start as 'created'. pay moves an order from 'created' to 'paid'.
+ship moves an order from 'paid' to 'shipped'. cancel is allowed only from
+'created' or 'paid', and moves the order to 'cancelled'. A shipped order cannot
+be cancelled. Calling pay on anything other than 'created' should raise ValueError.
+Calling ship on anything other than 'paid' should raise ValueError. Creating the
+same order_id twice should raise ValueError. Missing order_id should raise ValueError
+for pay, ship, cancel, and get_status. list_orders_by_status should return matching
+order IDs sorted alphabetically. Valid statuses are 'created', 'paid', 'shipped',
+and 'cancelled'. Invalid status should raise ValueError.
+```
+
+---
+
+### Step 2 — Generated TaskSpec
+
+The Orchestrator Agent converts the requirement into a structured `TaskSpec`.
+
+**Class:** `OrderStateMachine`
+
+**Methods:**
+
+```text
+create_order(order_id: str) -> None
+pay(order_id: str) -> None
+ship(order_id: str) -> None
+cancel(order_id: str) -> None
+get_status(order_id: str) -> str
+list_orders_by_status(status: str) -> list[str]
+```
+
+**Business Rules:**
+
+| Rule | Condition |
+|------|-----------|
+| Order Creation | `creating the same order_id twice → raise ValueError` |
+| State Transition: Pay | `order state is not 'created' → raise ValueError` |
+| State Transition: Ship | `order state is not 'paid' → raise ValueError` |
+| State Transition: Cancel | `order state is 'shipped' → raise ValueError` |
+| Missing Order | `missing order_id in pay, ship, cancel, get_status → raise ValueError` |
+| List Orders by Status | `invalid status → raise ValueError` |
+
+---
+
+### Step 3 — Generated Test Suite
+
+The Tester Agent generates a fixed pytest suite from the TaskSpec. No implementation code exists yet.
+
+```python
+def test_cancel_order_successfully():
+    system = OrderStateMachine()
+    system.create_order('order_1')
+    system.cancel('order_1')
+    assert system.get_status('order_1') == 'cancelled'
+
+def test_cancel_order_in_shipped_state_raises_value_error():
+    system = OrderStateMachine()
+    system.create_order('order_1')
+    system.pay('order_1')
+    system.ship('order_1')
+    with pytest.raises(ValueError):
+        system.cancel('order_1')
+
+def test_list_orders_by_invalid_status_raises_value_error():
+    system = OrderStateMachine()
+    with pytest.raises(ValueError):
+        system.list_orders_by_status('invalid_status')
+```
+
+11 tests total. Each test targets a specific business rule.
+
+---
+
+### Step 4 — Iteration 1: FAILED
+
+The Developer Agent generates the initial implementation. The Pytest Runner executes the fixed suite.
+
+**Result: 10 passed, 1 failed**
+
+```text
+FAILED test_generated.py::test_cancel_order_successfully
+
+________________________ test_cancel_order_successfully ________________________
+
+    def test_cancel_order_successfully():
+        system = OrderStateMachine()
+        system.create_order('order_1')
+        system.cancel('order_1')
+>       assert system.get_status('order_1') == 'cancelled'
+E       AssertionError: assert 'canceled' == 'cancelled'
+E
+E         - cancelled
+E         ?       -
+E         + canceled
+
+test_generated.py:58: AssertionError
+========================= 1 failed, 10 passed in 0.02s =========================
+```
+
+**Failing line (`generated_code_iter1.py`):**
+
+```python
+self.orders[order_id] = 'canceled'   # American spelling — test expects 'cancelled'
+```
+
+---
+
+### Step 5 — Failure Analysis
+
+The Failure Analyzer reads the pytest output and produces a structured diagnosis (`failure_analysis_iter1.json`):
+
+```json
+{
+  "failed_tests": ["test_cancel_order_successfully"],
+  "inferred_rules": [
+    "An order should transition to 'cancelled' state (with British spelling) when canceled successfully."
+  ],
+  "likely_bug": "The system returns 'canceled' instead of 'cancelled', indicating a spelling inconsistency.",
+  "patch_instruction": "Review the OrderStateMachine to ensure it uses 'cancelled' (with British English spelling) instead of 'canceled' for order cancellation state consistency, and update the get_status method accordingly.",
+  "expected_value": "cancelled",
+  "actual_value": "canceled",
+  "difference": "Difference in spelling: 'canceled' in American English vs 'cancelled' in British English.",
+  "failure_category": "validation_error",
+  "confidence": 0.9
+}
+```
+
+The diagnosis identifies the exact cause before the Developer Agent is re-prompted.
+
+---
+
+### Step 6 — Iteration 2: PASSED
+
+The Developer Agent receives the failure analysis and produces a corrected implementation.
+
+**Fix (`generated_code_iter2.py`):**
+
+```python
+# 'canceled' → 'cancelled' in valid_states
+self.valid_states = {'created', 'paid', 'shipped', 'cancelled'}
+
+# 'canceled' → 'cancelled' in cancel()
+self.orders[order_id] = 'cancelled'
+```
+
+**Result: 11 passed**
+
+```text
+========================= 11 passed in 0.01s =========================
+```
+
+---
+
+### Step 7 — Quality Critic Verdict
+
+The Code Quality Critic reviews the passing implementation for overfitting or rule violations.
+
+**`quality_report_iter2.json`:**
+
+```json
+{
+  "passed": true,
+  "flags": [],
+  "summary": "The code correctly implements the business rules without any signs of overfitting or anomalies."
+}
+```
+
+Run complete. All artifacts written to `artifacts/runs/20260512_115150/`.
+
+---
+
+## Known Limitations
+
+- No execution sandboxing (generated code runs in the local process environment)
+- Single-candidate generation only (no parallel candidate sampling)
+- No retrieval grounding for spec generation
+- No dataset-level regression harness
+- Limited benchmark diversity (Python functions and classes only)
+- No semantic equivalence verification between iterations
+
+---
+
+## Planned Improvements
+
+- Sandboxed execution environment
+- Parallel candidate generation with selection
+- Self-play benchmark generation
+- MLflow/Evidently evaluation tracking
+- Dataset-driven regression testing
+- LangGraph orchestration runtime
+- Multi-language support
+- Retrieval-augmented spec grounding
 
 ---
 
@@ -182,7 +477,7 @@ The orchestrator sets `class_name="ShoppingCart"` and populates `methods` with t
 
 ### Example 3 — batch benchmark
 
-`run_batch.py` runs the MVP 1 benchmark set (5 progressive tasks of increasing difficulty):
+`run_batch.py` runs the MVP Benchmark Suite A (5 progressive tasks):
 
 ```bash
 python3 examples/run_batch.py
@@ -567,45 +862,6 @@ run_report.md
 
 ---
 
-## Why This Architecture Matters
-
-This project demonstrates the core pattern behind reliable code-generation agents:
-
-```text
-Spec → Tests → Code → Execute → Analyze → Refine → Critique → Report
-```
-
-The system uses real tool output instead of vague self-reflection.
-
-The important difference is this:
-
-```text
-LLM output is probabilistic.
-Test results are factual.
-```
-
-By grounding the agent in executable feedback, the system can systematically improve instead of merely generating code once and hoping it works.
-
----
-
-## What This Project Shows
-
-This project demonstrates practical AI engineering skills:
-
-- structured output modeling with Pydantic
-- agent role separation
-- pytest as an executable evaluator
-- iterative refinement loops
-- failure trace capture
-- failure analysis
-- quality criticism after green tests
-- artifact-based development
-- run-level observability
-- report generation
-- evaluation-driven software generation
-
----
-
 ## Current Status
 
 Project 1 MVP is working for small Python function/class tasks.
@@ -624,49 +880,6 @@ The current version supports:
 - quality criticism with class-specific checks
 - run report with Task Spec section (type, class, methods table)
 - two working examples: `run_shipping.py` and `run_shopping_cart.py`
-
----
-
-## MVP 1 Benchmark Results
-
-### Original MVP 1 Benchmark (Easy/Medium Tasks)
-
-Batch run executed on 2026-05-12 using the MVP 1 benchmark set (5 progressive tasks):
-
-| # | Task | Status | Iterations |
-|---|------|--------|------------|
-| 1 | apply_discount (function) | ✓ Passed | 2 |
-| 2 | calculate_ticket_price (function) | ✓ Passed | 1 |
-| 3 | BankAccount (class) | ✓ Passed | 1 |
-| 4 | Inventory (class) | ✓ Passed | 1 |
-| 5 | GradeBook (class) | ✓ Passed | 1 |
-
-**Summary:** 5/5 tasks passed (100% success rate)
-
-**Metrics:**
-- Average iterations to success: 1.2
-- 4/5 tasks converged on first attempt
-- 1 task (apply_discount) required 2 iterations due to floating-point precision edge case
-- Quality critic approved all implementations
-- No overfitting or suspicious patterns detected
-
-### Harder MVP 1 Benchmark — Earlier Result (pre-repair-mode upgrade)
-
-Batch run using the harder benchmark set (5 tasks with increased complexity), recorded before the failure-analysis and repair-mode improvements:
-
-| # | Task | Status | Iterations |
-|---|------|--------|------------|
-| 1 | calculate_coupon_discount | ✗ Failed | 6 |
-| 2 | calculate_late_fee | ✓ Passed | 2 |
-| 3 | LoginAttemptTracker | ✓ Passed | 1 |
-| 4 | OrderStateMachine | ✓ Passed | 1 |
-| 5 | RoomBooking | ✓ Passed | 2 |
-
-**Summary:** 4/5 tasks passed (80% success rate)
-
-**Known weakness at the time:** Arithmetic composition with caps/modifiers (e.g., calculate_coupon_discount with tiered calculations, override rules, and caps). The failure analyzer was guessing category from the test name rather than reading assertion evidence, and the developer was allowed to drift into business-rule changes on precision failures.
-
-**Status:** This result predates the Phase 1 repair-mode upgrade (failure category extraction, `_get_repair_mode()`, PRECISION/FORCED_PRECISION repair modes). The hard benchmark should be rerun against the updated codebase before this result is treated as current.
 
 ---
 
