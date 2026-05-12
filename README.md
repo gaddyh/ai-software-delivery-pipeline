@@ -180,6 +180,16 @@ python3 examples/run_shopping_cart.py
 
 The orchestrator sets `class_name="ShoppingCart"` and populates `methods` with the public API. The tester instantiates the class and tests behavior through its methods.
 
+### Example 3 — batch benchmark
+
+`run_batch.py` runs the MVP 1 benchmark set (5 progressive tasks of increasing difficulty):
+
+```bash
+python3 examples/run_batch.py
+```
+
+This executes the pipeline for all benchmark tasks and produces a summary table with pass/fail status and iteration counts.
+
 ### Report generation
 
 Generate or regenerate a report for the latest run:
@@ -614,6 +624,31 @@ The current version supports:
 - quality criticism with class-specific checks
 - run report with Task Spec section (type, class, methods table)
 - two working examples: `run_shipping.py` and `run_shopping_cart.py`
+
+---
+
+## MVP 1 Benchmark Results
+
+Batch run executed on 2026-05-12 using the MVP 1 benchmark set (5 progressive tasks):
+
+| # | Task | Status | Iterations |
+|---|------|--------|------------|
+| 1 | apply_discount (function) | ✓ Passed | 2 |
+| 2 | calculate_ticket_price (function) | ✓ Passed | 1 |
+| 3 | BankAccount (class) | ✓ Passed | 1 |
+| 4 | Inventory (class) | ✓ Passed | 1 |
+| 5 | GradeBook (class) | ✓ Passed | 1 |
+
+**Summary:** 5/5 tasks passed (100% success rate)
+
+**Metrics:**
+- Average iterations to success: 1.2
+- 4/5 tasks converged on first attempt
+- 1 task (apply_discount) required 2 iterations due to floating-point precision edge case
+- Quality critic approved all implementations
+- No overfitting or suspicious patterns detected
+
+**Note:** The benchmark demonstrates the system's ability to converge or produce useful failure reports, which is the MVP 1 standard.
 
 ---
 

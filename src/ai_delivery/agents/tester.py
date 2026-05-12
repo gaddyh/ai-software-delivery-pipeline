@@ -25,6 +25,9 @@ class TesterAgent:
         if self.llm is not None:
             result = self.llm.invoke(generate_tests_prompt(task_spec, code))
             test_code = result.get("tests", "")
+            # Handle case where LLM returns a list of lines instead of a string
+            if isinstance(test_code, list):
+                test_code = "\n".join(test_code)
             return GeneratedArtifact(
                 content=test_code,
                 file_type="py",
