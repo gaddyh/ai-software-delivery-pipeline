@@ -8,10 +8,19 @@ if TYPE_CHECKING:
     from ai_delivery.models.task_spec import TaskSpec
 
 
+def _format_rules(business_rules: list) -> str:
+    """Format a list of BusinessRule instances (or dicts) as 'name: rule' lines."""
+    lines = []
+    for r in business_rules:
+        if hasattr(r, "name") and hasattr(r, "rule"):
+            lines.append(f"  {r.name}: {r.rule}")
+        elif isinstance(r, dict):
+            lines.append(f"  {r.get('name', '?')}: {r.get('rule', '?')}")
+    return "\n".join(lines)
+
+
 def generate_tests_prompt(task_spec: "TaskSpec", code: str = "") -> str:
     """Prompt that asks the LLM to write a pytest suite grounded in the task spec."""
-    import json
-
     edge_cases = (
         "\n".join(f"  - {e}" for e in task_spec.edge_cases)
         if task_spec.edge_cases
@@ -24,7 +33,7 @@ def generate_tests_prompt(task_spec: "TaskSpec", code: str = "") -> str:
     )
     business_rules_section = (
         f"--- BUSINESS RULES (ground truth — use these exact numbers) ---\n"
-        f"{json.dumps(task_spec.business_rules, indent=2)}\n"
+        f"{_format_rules(task_spec.business_rules)}\n"
         f"--- END BUSINESS RULES ---\n\n"
         if task_spec.business_rules
         else ""

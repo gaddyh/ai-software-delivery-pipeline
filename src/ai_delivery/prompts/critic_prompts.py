@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -31,11 +30,22 @@ QUALITY_REPORT_SCHEMA: dict = {
 }
 
 
+def _format_rules(business_rules: list) -> str:
+    """Format a list of BusinessRule instances (or dicts) as 'name: rule' lines."""
+    lines = []
+    for r in business_rules:
+        if hasattr(r, "name") and hasattr(r, "rule"):
+            lines.append(f"  {r.name}: {r.rule}")
+        elif isinstance(r, dict):
+            lines.append(f"  {r.get('name', '?')}: {r.get('rule', '?')}")
+    return "\n".join(lines)
+
+
 def review_code_prompt(task_spec: "TaskSpec", code: str) -> str:
     """Build the prompt that asks the LLM to review generated code for overfitting."""
     business_rules_section = (
         f"--- BUSINESS RULES (the real spec) ---\n"
-        f"{json.dumps(task_spec.business_rules, indent=2)}\n"
+        f"{_format_rules(task_spec.business_rules)}\n"
         f"--- END BUSINESS RULES ---\n\n"
         if task_spec.business_rules
         else ""

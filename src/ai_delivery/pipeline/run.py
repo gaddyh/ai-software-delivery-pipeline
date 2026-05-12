@@ -18,6 +18,7 @@ from ai_delivery.agents.tester import TesterAgent
 from ai_delivery.agents.failure_analyzer import FailureAnalyzerAgent
 from ai_delivery.agents.critic import CodeQualityCriticAgent
 from ai_delivery.llm.openai_client import OpenAIClient
+from ai_delivery.reporting.report_generator import ReportGenerator
 
 MAX_ITERATIONS = 6
 
@@ -90,6 +91,8 @@ class RunPipeline:
             # ── Stage 1: Task assignment ──────────────────────────────────
             task_spec = self.orchestrator.assign_task(user_message)
             results["task_spec"] = task_spec
+            task_spec_file = run_dir / "task_spec.json"
+            task_spec_file.write_text(task_spec.model_dump_json(indent=2))
             print(f"\nStage 1 \u2502 Task assigned: {task_spec.description}")
 
             # ── Stage 2: Initial code synthesis ──────────────────────────
@@ -228,6 +231,13 @@ class RunPipeline:
             if results.get("execution_result") else None,
         }
         summary_file.write_text(json.dumps(summary, indent=2))
+
+        try:
+            report_path = ReportGenerator().generate_and_save(run_dir)
+            print(f"         \u2514 run_report.md written: {report_path.name}")
+        except Exception as report_err:
+            print(f"Warning: could not write run_report.md: {report_err}")
+
         return results
 
     def get_run_history(self) -> list[dict]:

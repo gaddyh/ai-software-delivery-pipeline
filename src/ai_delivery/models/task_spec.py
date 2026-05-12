@@ -1,6 +1,13 @@
 from pydantic import BaseModel, Field
 
 
+class BusinessRule(BaseModel):
+    """A single named business rule with a precise, human-readable condition string."""
+
+    name: str
+    rule: str
+
+
 class TaskSpec(BaseModel):
     raw_requirement: str
     function_name: str
@@ -10,10 +17,10 @@ class TaskSpec(BaseModel):
     constraints: list[str] = Field(default_factory=list)
     success_criteria: list[str] = Field(default_factory=list)
     edge_cases: list[str] = Field(default_factory=list)
-    business_rules: dict = Field(
-        default_factory=dict,
+    business_rules: list[BusinessRule] = Field(
+        default_factory=list,
         description=(
-            "Structured business rules extracted from the requirement: "
-            "pricing tiers, thresholds, surcharges, and validation rules with exact values."
+            "Structured business rules as a list of {name, rule} pairs, "
+            "each encoding one precise condition with exact numeric values."
         ),
     )

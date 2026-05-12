@@ -14,13 +14,20 @@ def assign_task_prompt(user_message: str) -> str:
         "  - constraints: list of implementation constraints (may be empty)\n"
         "  - success_criteria: list of measurable acceptance criteria\n"
         "  - edge_cases: list of edge cases that must be handled\n"
-        "  - business_rules: a JSON-encoded string capturing ALL explicit numeric thresholds, "
-        "pricing tiers, zone/category surcharges, and validation rules with exact values. "
-        "Include every number mentioned in the requirement. "
-        'Example value (as a JSON string): \'{"free_shipping_threshold": 150, '
-        '"weight_tiers": [{"max_kg": 2, "cost": 5.0}, {"max_kg": 5, "cost": 10.0}, {"min_kg": 5, "cost": 18.0}], '
-        '"zone_surcharges": {"local": 0.0, "regional": 4.0, "international": 12.0}, '
-        '"invalid_rules": ["negative cart_total raises ValueError"]}\'. '
+        "  - business_rules: a JSON-encoded string containing a LIST of objects, "
+        "one per distinct business rule or validation constraint. "
+        "Each object has exactly two keys: "
+        '\'name\' (short label, e.g. "Free shipping") and '
+        '\'rule\' (precise condition string using → to show the outcome and exact numbers, '
+        'e.g. "cart_total > 150.0 → return 0.0"). '
+        "Use 'base cost' for weight-tier costs and 'add X' for surcharges. "
+        "Include every rule mentioned in the requirement. "
+        'Example value (as a JSON string): \'['
+        '{"name": "Free shipping", "rule": "cart_total > 150.0 → return 0.0"}, '
+        '{"name": "Weight tier 1", "rule": "package_weight <= 2.0 → base cost 5.0"}, '
+        '{"name": "Regional surcharge", "rule": "destination_zone == \'regional\' → add 4.0"}, '
+        '{"name": "Negative inputs", "rule": "cart_total < 0 OR package_weight < 0 → raise ValueError"}'
+        "]\'. "
         "Do not invent values not present in the requirement.\n"
     )
 
