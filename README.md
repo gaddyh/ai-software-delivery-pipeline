@@ -1,6 +1,6 @@
 # AI Software Delivery Pipeline
 
-An evaluation-driven AI software delivery pipeline that turns a natural-language requirement into tested, refined, and quality-reviewed Python code.
+An MVP prototype for artifact-based, evaluation-driven code generation and repair on small Python function and class tasks.
 
 The system is not a chatbot demo. It is an artifact-based software generation loop:
 
@@ -55,7 +55,7 @@ Instead of asking an LLM to generate code once and hoping it works, the system:
    Produces initial implementation
    ↓
 5. Pytest Runner
-   Executes tests in an isolated environment
+   Executes tests in a local pytest runner
    ↓
 6. Failure Analyzer
    Converts pytest output into likely bug + patch instruction
@@ -608,7 +608,7 @@ This project demonstrates practical AI engineering skills:
 
 ## Current Status
 
-Project 1 MVP is working.
+Project 1 MVP is working for small Python function/class tasks.
 
 The current version supports:
 
