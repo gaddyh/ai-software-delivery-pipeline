@@ -1,40 +1,150 @@
 # AI Software Delivery Pipeline
 
-An AI-powered software delivery pipeline that uses autonomous agents to develop, test, and ship software automatically.
+An evaluation-driven AI software delivery pipeline that turns a natural-language requirement into tested, refined, and quality-reviewed Python code.
+
+The system is not a chatbot demo. It is an artifact-based software generation loop:
+
+```text
+User Requirement
+→ Structured Task Spec
+→ Fixed Test Suite
+→ Initial Code
+→ Pytest Execution
+→ Failure Analysis
+→ Code Refinement
+→ Quality Critic
+→ Run Report
+```
+
+The core idea is simple:
+
+> Tests become executable behavioral specifications, and real tool output drives refinement.
+
+---
+
+## Project Goal
+
+This project explores a practical pattern for reliable code-generation agents.
+
+Instead of asking an LLM to generate code once and hoping it works, the system:
+
+1. Interprets a user requirement.
+2. Converts it into a structured task specification.
+3. Generates a fixed pytest test suite from that spec.
+4. Generates implementation code.
+5. Runs the tests.
+6. Sends failure traces and failure analysis back to the developer agent.
+7. Refines the code until tests pass.
+8. Runs a quality critic to detect overfitting or suspicious implementation logic.
+9. Writes a full run report.
+
+---
+
+## Current Pipeline Flow
+
+```text
+1. User Message
+   ↓
+2. Orchestrator Agent
+   Produces structured TaskSpec
+   ↓
+3. Tester Agent
+   Produces a fixed pytest suite from the TaskSpec
+   ↓
+4. Developer Agent
+   Produces initial implementation
+   ↓
+5. Pytest Runner
+   Executes tests in an isolated environment
+   ↓
+6. Failure Analyzer
+   Converts pytest output into likely bug + patch instruction
+   ↓
+7. Developer Agent
+   Refines code using failure trace + failure analysis
+   ↓
+8. Repeat execution/refinement until tests pass or max iterations reached
+   ↓
+9. Code Quality Critic
+   Reviews passing code for overfitting or rule violations
+   ↓
+10. Run Report Generator
+    Writes run_report.md
+```
+
+Important rule:
+
+```text
+Code failed → return to Developer Agent
+Spec changed → regenerate tests with Tester Agent
+```
+
+The Tester Agent runs once per task. During refinement, the same fixed test suite is reused.
+
+---
 
 ## Project Structure
 
-```
+```text
 ai-software-delivery-pipeline/
 ├── pyproject.toml
 ├── README.md
 ├── .env.example
 ├── examples/
-│   └── run_shipping_once.py
+│   ├── run_shipping.py
+│   └── generate_report.py
 ├── artifacts/
 │   └── runs/
+│       └── {run_id}/
+│           ├── task_spec.json
+│           ├── test_suite.py
+│           ├── generated_code_iter1.py
+│           ├── generated_code_iter2.py
+│           ├── execution_result_iter1.json
+│           ├── failure_analysis_iter1.json
+│           ├── quality_report_iterN.json
+│           ├── failure_trace_context.json
+│           ├── summary.json
+│           └── run_report.md
 ├── src/
 │   └── ai_delivery/
 │       ├── models/
 │       │   ├── task_spec.py
 │       │   ├── generated_artifact.py
-│       │   └── execution_result.py
+│       │   ├── execution_result.py
+│       │   ├── failure_analysis.py
+│       │   └── quality_report.py
 │       ├── agents/
 │       │   ├── orchestrator.py
 │       │   ├── tester.py
-│       │   └── developer.py
+│       │   ├── developer.py
+│       │   ├── failure_analyzer.py
+│       │   └── critic.py
+│       ├── prompts/
+│       │   ├── orchestrator_prompts.py
+│       │   ├── tester_prompts.py
+│       │   ├── developer_prompts.py
+│       │   ├── failure_analyzer_prompts.py
+│       │   └── critic_prompts.py
 │       ├── execution/
 │       │   └── pytest_runner.py
+│       ├── reporting/
+│       │   ├── __init__.py
+│       │   └── report_generator.py
 │       └── pipeline/
 │           └── run_once.py
 └── tests/
 ```
+
+---
 
 ## Installation
 
 ```bash
 pip install -e .
 ```
+
+---
 
 ## Configuration
 
@@ -44,174 +154,427 @@ Copy `.env.example` to `.env` and configure your environment variables:
 cp .env.example .env
 ```
 
+---
+
 ## Usage
 
-Run the shipping pipeline once:
+Run the shipping pipeline:
 
 ```bash
-python examples/run_shipping_once.py
+python3 examples/run_shipping.py
 ```
+
+Generate or regenerate a report for the latest run:
+
+```bash
+python3 examples/generate_report.py
+```
+
+Generate a report for a specific historical run:
+
+```bash
+python3 examples/generate_report.py 20260512_004408
+```
+
+---
+
+## Core Artifacts
+
+Each run produces explicit artifacts under:
+
+```text
+artifacts/runs/{run_id}/
+```
+
+### `task_spec.json`
+
+The structured interpretation of the user requirement.
+
+Example business-rule format:
+
+```json
+"business_rules": [
+  {
+    "name": "Free shipping",
+    "rule": "cart_total > 150.0 → return 0.0"
+  },
+  {
+    "name": "Weight tier 1",
+    "rule": "package_weight <= 2.0 → base cost 5.0"
+  },
+  {
+    "name": "Regional surcharge",
+    "rule": "destination_zone == 'regional' → add 4.0"
+  }
+]
+```
+
+### `test_suite.py`
+
+A fixed pytest suite generated from the task spec.
+
+The tests should represent executable behavior, including:
+
+- normal cases
+- boundary cases
+- validation rules
+- invalid inputs
+- domain-specific constraints
+
+### `generated_code_iterN.py`
+
+The implementation generated or refined by the Developer Agent for each iteration.
+
+### `execution_result_iterN.json`
+
+The raw pytest execution result for each iteration.
+
+### `failure_analysis_iterN.json`
+
+A structured diagnosis generated from failed pytest output.
+
+Includes:
+
+- failed tests
+- inferred rules
+- likely bug
+- patch instruction
+
+### `quality_report_iterN.json`
+
+The Code Quality Critic’s review after tests pass.
+
+This checks whether the code appears to:
+
+- implement the business rules generally
+- avoid hardcoded test-case patches
+- avoid misleading logic
+- avoid overfitting to the visible tests
+
+### `run_report.md`
+
+A human-readable report generated from the run artifacts.
+
+---
 
 ## Components
 
-- **Orchestrator Agent**: Coordinates the overall pipeline execution
-- **Developer Agent**: Generates code based on task specifications
-- **Tester Agent**: Writes and executes tests to validate generated code
-- **Pytest Runner**: Executes pytest and captures results
+### Orchestrator Agent
+
+Converts the raw user request into a structured `TaskSpec`.
+
+The task spec includes:
+
+- raw requirement
+- function name
+- function signature
+- module name
+- description
+- success criteria
+- edge cases
+- named business rules
+
+The Orchestrator is responsible for turning vague user language into a clear behavioral contract.
+
+---
+
+### Tester Agent
+
+Creates a fixed pytest suite from the structured `TaskSpec`.
+
+The Tester Agent runs once per task.
+
+It should not depend on generated implementation code. Its job is to encode expected behavior from the task specification.
+
+Good tests should be rule-specific:
+
+```python
+def test_cart_total_over_150_returns_free_shipping():
+    assert calculate_shipping(151.0, 5.0, "local") == 0.0
+```
+
+This makes failure analysis easier because each failing test points to a specific violated rule.
+
+---
+
+### Developer Agent
+
+Generates the initial implementation and later refines it.
+
+The Developer receives:
+
+- task specification
+- fixed test suite
+- previous code version
+- pytest failure output
+- failure analysis
+- prior failure history
+
+During refinement, only the Developer Agent is called again. The Tester Agent is not rerun unless the task spec changes.
+
+---
+
+### Pytest Runner
+
+Executes the generated test suite against the generated implementation.
+
+It captures:
+
+- pass/fail status
+- exit code
+- stdout
+- stderr
+- failed test names
+- assertion errors
+- stack traces
+
+This is the factual feedback source for the loop.
+
+---
+
+### Failure Analyzer
+
+Converts raw pytest failure output into a structured debugging artifact.
+
+Example:
+
+```json
+{
+  "failed_tests": [
+    "test_weight_tier_2_base_cost",
+    "test_regional_destination_surcharge"
+  ],
+  "inferred_rules": [
+    "For package_weight 3.0 in local zone, shipping should be 10.0.",
+    "For package_weight 3.0 in regional zone, shipping should be 14.0."
+  ],
+  "likely_bug": "The implementation incorrectly calculates base costs and surcharges.",
+  "patch_instruction": "Correct the weight tiers and apply destination surcharge after base cost calculation."
+}
+```
+
+The Failure Analyzer reduces ambiguity before sending the problem back to the Developer Agent.
+
+---
+
+### Code Quality Critic
+
+Runs after tests pass.
+
+Its purpose is to catch cases where the implementation passes tests but is still suspicious.
+
+Examples of problems the critic should flag:
+
+- hardcoded test-case values
+- negative surcharges unless specified
+- comments like “adjusted to satisfy test”
+- exact-value hacks
+- misleading unused structures
+- logic that contradicts the business rules
+
+Passing tests are necessary, but not always enough. The critic acts as an additional quality gate.
+
+---
+
+### Run Report Generator
+
+Generates `run_report.md` from run artifacts.
+
+The report includes:
+
+- summary
+- task spec
+- business rules table
+- test suite list
+- iteration timeline
+- failure analysis
+- critic verdicts
+- final implementation
+- quality sign-off
+
+This turns every run into an auditable engineering artifact.
 
 ---
 
 ## Test-Driven Code Generation Loop
 
-The following six stages describe the full execution of the loop, from the initial task assignment through code synthesis, test generation, validation, iterative refinement, and final success.
+The loop has six main stages.
 
-Each stage represents a discrete handoff between agents. The output of one stage becomes the input to the next.
+---
 
-### Stage 1: Task Assignment
+### Stage 1: Task Specification
 
-The workflow begins when the Orchestrator Agent assigns a concrete task to the Developer Agent.
+The workflow begins with a raw user requirement.
 
-**Example task:**
+Example:
 
-```
-Write a function calculate_shipping(cart_total, weight)
-that returns the shipping cost after applying appropriate discounts.
-```
-
-At this point, no code exists yet. The task enters the generation pipeline.
-
-### Stage 2: Code Synthesis
-
-The Developer Agent generates an initial Python implementation.
-
-It uses the available repository context to:
-
-- follow existing code style conventions
-- choose appropriate libraries
-- structure the function according to project patterns
-- produce an initial solution
-
-The generated code is saved as an artifact in the shared workflow state. Specifically, the code is written to a sandboxed file system inside a Docker container, where it can be executed and tested in isolation.
-
-The file path and code content are also stored in the `AgentState` dictionary, making them available to downstream agents without requiring direct file-system access.
-
-This first implementation is the developer agent's best attempt based on the requirement. But it is not trusted yet — it still needs verification.
-
-### Stage 3: Test Synthesis
-
-The generated code and the original task specification are passed to the Tester Agent.
-
-The tester agent receives a clear directive:
-
-```
-Write a comprehensive pytest test suite that verifies the code against the requirements,
-including important edge cases.
+```text
+Hey, I need a Python function for our checkout service.
+The function should be called calculate_shipping and take cart_total,
+package_weight, and destination_zone.
 ```
 
-The tester agent generates tests that check the expected behavior of the implementation. One important example is a test for negative weight — even though this edge case may not have been explicitly mentioned in the original requirement, the tester identifies it as essential for robust behavior.
+The Orchestrator Agent converts this into a structured `TaskSpec`.
 
-> **Stages 2 and 3 execute in sequence, not in parallel.** The tester agent needs the developer agent's code as input in order to generate meaningful tests.
+At this point, no code exists yet.
 
-The outputs of these two stages are:
+---
 
+### Stage 2: Test Synthesis
+
+The Tester Agent receives the `TaskSpec` and generates a fixed pytest suite.
+
+The tests are based on the specification, not on generated code.
+
+This matters because tests should represent expected behavior, not merely adapt to an implementation.
+
+The output is:
+
+```text
+test_suite.py
 ```
-Implementation code
-+
-Test suite
+
+---
+
+### Stage 3: Code Synthesis
+
+The Developer Agent receives the same `TaskSpec` and generates the initial Python implementation.
+
+The output is:
+
+```text
+generated_code_iter1.py
 ```
 
-Both artifacts then flow into the execution environment.
+This first implementation is not trusted yet. It must be executed and validated.
+
+---
 
 ### Stage 4: Execution and Validation
 
-The implementation code and test suite are saved into a sandboxed environment (Docker). The system then runs the test suite using `pytest`.
+The Pytest Runner executes the fixed test suite against the generated implementation.
 
-The test runner captures:
+It records the result as:
 
-- which tests passed
-- which tests failed
-- assertion errors
-- stack traces
-- relevant execution output
-
-This concrete failure output becomes critical feedback for the next iteration. Unlike vague LLM self-reflection, test output is factual and grounded.
-
-### Stage 5: The Refinement Loop
-
-The workflow reaches a decision point: **did all tests pass?**
-
-If the answer is no, the system follows the failure path. The stack trace is parsed programmatically using Python's built-in `traceback` module. This extracts structured information such as:
-
-- file name
-- line number
-- function name
-- error message
-
-This structured failure information is injected into the refinement prompt. The developer agent does not merely receive a message saying *"the tests failed"* — instead, it receives the full context:
-
-```
-Original task specification
-+
-Current code version
-+
-Complete pytest output
-+
-Stack traces
-+
-Assertion errors
-+
-Summary of prior failed attempts
+```text
+execution_result_iter1.json
 ```
 
-This allows the agent to focus on the exact remaining problem instead of guessing. The updated code is then saved back into the sandbox, the tests are executed again, and the results are evaluated. This loop continues until the tests pass or the system reaches a stopping condition.
+If all tests pass, the pipeline moves to quality review.
 
-### Stage 6: Success and Advancement
+If tests fail, the pipeline moves to failure analysis.
 
-When all tests pass, the workflow advances to the next stage. The validated code can now move forward to:
+---
 
-- integration
-- documentation
-- deployment
-- additional review
-- downstream workflows
+### Stage 5: Failure Analysis and Refinement
 
-The **Failure Trace Context** captures the full history of the refinement loop:
+When tests fail, the Failure Analyzer reads the pytest output and produces a structured diagnosis.
 
-- how many iterations were required
-- which tests failed at each attempt
-- what errors were encountered
-- how the code changed in response to feedback
+The Developer Agent then receives:
 
-This trace is useful for three reasons:
+```text
+TaskSpec
++
+Current code
++
+Pytest output
++
+Failure analysis
++
+Failure history
+```
 
-1. It provides transparency into the agent workflow.
-2. It supports debugging when convergence fails.
-3. It creates valuable training and evaluation data for future improvement.
+The Developer produces a revised implementation:
 
-Over time, these failure-resolution pairs can be analyzed and reused to improve the system's first-attempt success rate.
+```text
+generated_code_iter2.py
+```
+
+The same fixed test suite is executed again.
+
+This loop continues until:
+
+- tests pass
+- max iterations are reached
+- the system fails to converge
+
+---
+
+### Stage 6: Quality Review and Report Generation
+
+When tests pass, the Code Quality Critic reviews the final code.
+
+If the critic approves the implementation, the run succeeds.
+
+If the critic rejects it, the system can send the critic feedback back to the Developer Agent for another refinement round.
+
+Finally, the Run Report Generator writes:
+
+```text
+run_report.md
+```
 
 ---
 
 ## Why This Architecture Matters
 
-This iterative loop is the core pattern behind reliable code agents:
+This project demonstrates the core pattern behind reliable code-generation agents:
 
+```text
+Spec → Tests → Code → Execute → Analyze → Refine → Critique → Report
 ```
-Generate → Test → Fail → Refine → Test Again → Pass
+
+The system uses real tool output instead of vague self-reflection.
+
+The important difference is this:
+
+```text
+LLM output is probabilistic.
+Test results are factual.
 ```
 
-It matters because it uses factual feedback from real tools to correct probabilistic LLM output. Without this loop, the agent simply generates code once and hopes it works. With this loop, the agent becomes a self-correcting system that demonstrates correctness through evidence.
+By grounding the agent in executable feedback, the system can systematically improve instead of merely generating code once and hoping it works.
 
-The architecture also shows that agents do not operate in isolation. They interact with real development infrastructure:
+---
 
-- file systems
-- Docker containers
-- test runners
-- compilers
-- execution logs
-- observability platforms
+## What This Project Shows
 
-The agent is not just chatting about code — it is writing files, running tests, parsing failures, and improving based on executable feedback.
+This project demonstrates practical AI engineering skills:
+
+- structured output modeling with Pydantic
+- agent role separation
+- pytest as an executable evaluator
+- iterative refinement loops
+- failure trace capture
+- failure analysis
+- quality criticism after green tests
+- artifact-based development
+- run-level observability
+- report generation
+- evaluation-driven software generation
+
+---
+
+## Current Status
+
+Project 1 MVP is working.
+
+The current version supports:
+
+- raw user requirement input
+- structured task specification
+- named business rules
+- test generation
+- code generation
+- pytest execution
+- failure analysis
+- iterative refinement
+- quality criticism
+- run report generation
+
+Next recommended step:
+
+> Add a small benchmark runner that executes 5–10 task prompts and produces aggregate metrics such as success rate, average iterations, and critic-fail count.
 
 ---
 
