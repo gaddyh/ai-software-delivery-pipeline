@@ -572,10 +572,6 @@ The current version supports:
 - quality criticism
 - run report generation
 
-Next recommended step:
-
-> Add a small benchmark runner that executes 5–10 task prompts and produces aggregate metrics such as success rate, average iterations, and critic-fail count.
-
 ---
 
 ## License
