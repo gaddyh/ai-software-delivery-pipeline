@@ -55,7 +55,7 @@ Instead of asking an LLM to generate code once and hoping it works, the system:
    Produces initial implementation
    ↓
 5. Pytest Runner
-   Executes tests in a local pytest runner
+   Executes tests in a temporary local pytest workspace
    ↓
 6. Failure Analyzer
    Converts pytest output into likely bug + patch instruction
@@ -650,9 +650,9 @@ Batch run executed on 2026-05-12 using the MVP 1 benchmark set (5 progressive ta
 - Quality critic approved all implementations
 - No overfitting or suspicious patterns detected
 
-### Harder MVP 1 Benchmark
+### Harder MVP 1 Benchmark — Earlier Result (pre-repair-mode upgrade)
 
-Batch run using the harder benchmark set (5 tasks with increased complexity):
+Batch run using the harder benchmark set (5 tasks with increased complexity), recorded before the failure-analysis and repair-mode improvements:
 
 | # | Task | Status | Iterations |
 |---|------|--------|------------|
@@ -664,9 +664,9 @@ Batch run using the harder benchmark set (5 tasks with increased complexity):
 
 **Summary:** 4/5 tasks passed (80% success rate)
 
-**Known weakness:** Arithmetic composition with caps/modifiers (e.g., calculate_coupon_discount with tiered calculations, override rules, and caps)
+**Known weakness at the time:** Arithmetic composition with caps/modifiers (e.g., calculate_coupon_discount with tiered calculations, override rules, and caps). The failure analyzer was guessing category from the test name rather than reading assertion evidence, and the developer was allowed to drift into business-rule changes on precision failures.
 
-**Note:** Both benchmarks demonstrate the system's ability to converge or produce useful failure reports, which is the MVP 1 standard.
+**Status:** This result predates the Phase 1 repair-mode upgrade (failure category extraction, `_get_repair_mode()`, PRECISION/FORCED_PRECISION repair modes). The hard benchmark should be rerun against the updated codebase before this result is treated as current.
 
 ---
 
