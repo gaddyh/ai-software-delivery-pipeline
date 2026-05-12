@@ -18,6 +18,7 @@ from ai_delivery.agents.tester import TesterAgent
 from ai_delivery.agents.failure_analyzer import FailureAnalyzerAgent
 from ai_delivery.agents.critic import CodeQualityCriticAgent
 from ai_delivery.llm.openai_client import OpenAIClient
+from ai_delivery.prompts.developer_prompts import _get_repair_mode
 from ai_delivery.reporting.report_generator import ReportGenerator
 
 MAX_ITERATIONS = 6
@@ -172,6 +173,11 @@ class RunPipeline:
                 )
                 analysis_file = run_dir / f"failure_analysis_iter{iteration}.json"
                 analysis_file.write_text(failure_analysis.model_dump_json(indent=2))
+                print(f"         category  : {failure_analysis.failure_category} (confidence {failure_analysis.confidence:.2f})")
+                if failure_analysis.expected_value or failure_analysis.actual_value:
+                    print(f"         expected  : {failure_analysis.expected_value}")
+                    print(f"         actual    : {failure_analysis.actual_value}")
+                    print(f"         delta     : {failure_analysis.difference}")
                 print(f"         likely_bug: {failure_analysis.likely_bug}")
                 print(f"         patch: {failure_analysis.patch_instruction[:120]}")
 
@@ -189,6 +195,8 @@ class RunPipeline:
                     failure_trace.history.append(record)
 
                 if iteration < MAX_ITERATIONS:
+                    repair_mode = _get_repair_mode(failure_trace, failure_analysis)
+                    print(f"  \u2192 repair_mode: {repair_mode}")
                     print(f"  \u2192 Sending FailureAnalysis + FailureTrace to Developer Agent...")
                     code_artifact = self.developer.generate_code(
                         task_spec, failure_trace,

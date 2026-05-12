@@ -1,5 +1,6 @@
 """Batch runner: execute the AI delivery pipeline for a list of user messages."""
 
+import argparse
 import os
 import sys
 from pathlib import Path
@@ -14,22 +15,37 @@ from ai_delivery.pipeline.run import RunPipeline
 
 # Import benchmark user messages
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from benchmark_user_messages import mvp1_benchmark_set as USER_MESSAGES
+from benchmark_user_messages import mvp1_benchmark_set, harder_mvp1_benchmark_set
+
+_BENCHMARK_SETS = {
+    "base": mvp1_benchmark_set,
+    "hard": harder_mvp1_benchmark_set,
+}
 
 # ── Runner ────────────────────────────────────────────────────────────────────
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description="Run the AI delivery pipeline benchmark.")
+    parser.add_argument(
+        "--benchmark",
+        choices=["base", "hard"],
+        default="base",
+        help="Which benchmark set to run: 'base' (mvp1_benchmark_set) or 'hard' (harder_mvp1_benchmark_set). Default: base.",
+    )
+    args = parser.parse_args()
+
+    user_messages = _BENCHMARK_SETS[args.benchmark]
     artifacts_dir = os.getenv("ARTIFACTS_DIR", "artifacts/runs")
     pipeline = RunPipeline(artifacts_dir=artifacts_dir)
 
-    total = len(USER_MESSAGES)
+    total = len(user_messages)
     results: list[dict] = []
 
     print("=" * 60)
-    print(f"Batch Run — {total} task(s)")
+    print(f"Batch Run [{args.benchmark}] — {total} task(s)")
     print("=" * 60)
 
-    for i, message in enumerate(USER_MESSAGES, start=1):
+    for i, message in enumerate(user_messages, start=1):
         print(f"\n[{i}/{total}] Starting task...")
         try:
             result = pipeline.run(message)
