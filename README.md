@@ -667,6 +667,7 @@ Batch run using the harder benchmark set (5 tasks with increased complexity):
 **Known weakness:** Arithmetic composition with caps/modifiers (e.g., calculate_coupon_discount with tiered calculations, override rules, and caps)
 
 **Note:** Both benchmarks demonstrate the system's ability to converge or produce useful failure reports, which is the MVP 1 standard.
+
 ---
 
 ## License
