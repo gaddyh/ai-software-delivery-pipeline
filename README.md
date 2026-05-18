@@ -38,7 +38,7 @@ If you only have 2 minutes:
 1. Read [Failure-Aware Repair Routing](#failure-aware-repair-routing)
 2. Check [Latest Hard Benchmark](#latest-hard-benchmark) — full report at [`reports/hard_benchmark_latest.md`](reports/hard_benchmark_latest.md)
 3. Read a curated run report: [`reports/example_run_report.md`](reports/example_run_report.md)
-4. Inspect `failure_analysis_iterN.json` in any run directory to see artifact-level routing
+4. Inspect [`reports/example_failure_analysis_iter1.json`](reports/example_failure_analysis_iter1.json) to see artifact-level routing
 
 ---
 
@@ -500,7 +500,6 @@ ai-software-delivery-pipeline/
 │       │   └── report_generator.py
 │       └── pipeline/
 │           └── run_once.py
-└── tests/
 ```
 
 ---

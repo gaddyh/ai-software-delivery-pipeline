@@ -1,0 +1,32 @@
+{
+  "failed_tests": [
+    {
+      "test_name": "test_list_orders_by_status_sorts_order_ids",
+      "failure_stage": "test_execution",
+      "failure_type": "assertion_mismatch",
+      "raw_exception_type": "AssertionError",
+      "expected": "['order001', 'order002', 'order123']",
+      "actual": "['order123', 'order001', 'order002']",
+      "error_message": "AssertionError: assert ['order123', 'order001', 'order002'] == ['order001', 'order002', 'order123']",
+      "trace_excerpt": "E       AssertionError: assert ['order123', ...', 'order002'] == ['order001', ...', 'order123']\nE         At index 0 diff: 'order123' != 'order001'\nE         Full diff:\nE           [\nE         +     'order123',\nE               'order001',...",
+      "blamed_artifact": "implementation",
+      "confidence": 0.9,
+      "evidence": [
+        "__________________ test_list_orders_by_status_sorts_order_ids __________________",
+        "assert ['order123', 'order001', 'order002'] == ['order001', 'order002', 'order123']",
+        "At index 0 diff: 'order123' != 'order001'"
+      ],
+      "failure_signature": "test_execution|assertion_mismatch|implementation|test_list_orders_by_status_sorts_order_ids|['order001', 'order002', 'order123']|['order123', 'order001', 'order002']|AssertionError"
+    }
+  ],
+  "failure_summary": "1 test failed. test_list_orders_by_status_sorts_order_ids has an assertion mismatch: expected ['order001', 'order002', 'order123'] but got ['order123', 'order001', 'order002'].",
+  "primary_failure_type": "assertion_mismatch",
+  "primary_blamed_artifact": "implementation",
+  "recommended_action": "repair_implementation",
+  "should_modify_code": true,
+  "should_modify_tests": false,
+  "should_review_spec": false,
+  "iteration_failure_signature": "test_execution|assertion_mismatch|implementation|test_list_orders_by_status_sorts_order_ids|['order001', 'order002', 'order123']|['order123', 'order001', 'order002']|AssertionError",
+  "routing_reason": "The implementation does not sort order IDs as expected, indicating an implementation logic error.",
+  "lesson": "Ensure sorting functionality in the order state machine adheres to expected behavior."
+}
