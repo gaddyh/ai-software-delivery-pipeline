@@ -72,9 +72,40 @@ def refine_code_prompt(
 
     analysis_section = ""
     if analysis is not None:
+        modify_code_str = "yes" if analysis.should_modify_code else "no"
+        modify_tests_str = "yes" if analysis.should_modify_tests else "no"
+
+        if analysis.should_modify_code:
+            repair_guidance = (
+                "Only make the smallest implementation change needed for this failure type.\n"
+                "Do not rewrite unrelated business rules."
+            )
+        else:
+            repair_guidance = (
+                "The failure appears to be in the test suite.\n"
+                "If you must return code, return the current implementation unchanged\n"
+                "unless there is clear implementation evidence in the pytest output."
+            )
+
+        policy_lines = [
+            "--- REPAIR POLICY ---",
+            f"Recommended action  : {analysis.recommended_action.value}",
+            f"Primary failure type: {analysis.primary_failure_type.value}",
+            f"Blamed artifact     : {analysis.primary_blamed_artifact.value}",
+            f"Modify code         : {modify_code_str}",
+            f"Modify tests        : {modify_tests_str}",
+        ]
+        if analysis.routing_reason:
+            policy_lines.append(f"Routing reason      : {analysis.routing_reason}")
+        if analysis.lesson:
+            policy_lines.append(f"Lesson              : {analysis.lesson}")
+        policy_lines.append("")
+        policy_lines.append(repair_guidance)
+        policy_lines.append("--- END REPAIR POLICY ---")
+
         failure_lines: list[str] = []
         for f in analysis.failed_tests:
-            line = f"  [{f.failure_type}] {f.test_name}"
+            line = f"  [{f.failure_type.value}] {f.test_name}"
             if f.expected and f.actual:
                 line += f"\n    expected : {f.expected}\n    actual   : {f.actual}"
             if f.error_message:
@@ -83,7 +114,9 @@ def refine_code_prompt(
                 line += f"\n    trace    :\n      " + f.trace_excerpt.replace("\n", "\n      ")
             failure_lines.append(line)
         failures_str = "\n\n".join(failure_lines) if failure_lines else "  (none)"
+
         analysis_section = (
+            "\n".join(policy_lines) + "\n\n"
             "--- STRUCTURED FAILURE ANALYSIS ---\n"
             "The failure analysis is factual, not prescriptive.\n"
             "You are responsible for identifying the root cause and applying a minimal general fix.\n\n"

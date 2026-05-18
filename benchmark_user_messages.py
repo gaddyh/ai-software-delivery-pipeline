@@ -120,16 +120,6 @@ benchmark_user_messages = [
     ),
 ]
 
-# Suggested MVP 1 Benchmark Set (first 5 + 2 regressions)
-mvp1_benchmark_set = [
-    benchmark_user_messages[0],  # apply_discount
-    benchmark_user_messages[1],  # calculate_ticket_price
-    benchmark_user_messages[2],  # BankAccount
-    benchmark_user_messages[3],  # Inventory
-    benchmark_user_messages[5],  # GradeBook
-]
-
-
 # Harder MVP 1 Benchmark User Messages
 # These are still one-artifact tasks: one function or one class in solution.py.
 # They are designed to stress TaskSpec quality, tester grounding, refinement, and critic behavior.
@@ -291,10 +281,43 @@ harder_benchmark_user_messages = [
 ]
 
 
+# Suite A — MVP smoke benchmark
+# Purpose:
+#   Prove the full pipeline works end-to-end on simple but representative tasks:
+#   validation, rounding, precedence rules, simple state, keyed state, and lifecycle behavior.
+#
+# Expected use:
+#   This suite should usually pass. It is not meant to be adversarial.
+mvp1_benchmark_set = [
+    benchmark_user_messages[0],  # apply_discount — validation + rounding
+    benchmark_user_messages[1],  # calculate_ticket_price — precedence rules
+    benchmark_user_messages[2],  # BankAccount — simple mutable state
+    benchmark_user_messages[3],  # Inventory — keyed mutable state
+    benchmark_user_messages[6],  # TaskTracker — lifecycle + sorted views
+]
+
+
+# Suite B — Hard business-logic benchmark
+# Purpose:
+#   Test whether the pipeline can handle harder one-artifact business logic:
+#   caps, rule ordering, lock behavior, forbidden transitions, interval overlap,
+#   and rollback/state consistency.
+#
+# Expected use:
+#   This is the main showcase benchmark.
 harder_mvp1_benchmark_set = [
-    harder_benchmark_user_messages[0],  # calculate_coupon_discount
-    harder_benchmark_user_messages[1],  # calculate_late_fee
-    harder_benchmark_user_messages[3],  # LoginAttemptTracker
-    harder_benchmark_user_messages[6],  # OrderStateMachine
-    harder_benchmark_user_messages[7],  # RoomBooking
+    harder_benchmark_user_messages[0],  # calculate_coupon_discount — caps + rule ordering
+    harder_benchmark_user_messages[3],  # LoginAttemptTracker — lock behavior + reset
+    harder_benchmark_user_messages[6],  # OrderStateMachine — forbidden transitions
+    harder_benchmark_user_messages[7],  # RoomBooking — interval overlap logic
+    harder_benchmark_user_messages[9],  # BudgetAllocator — rollback + state consistency
+]
+
+
+adversarial_benchmark_set_original = [
+    harder_benchmark_user_messages[2],  # Playlist — replace vs duplicate
+    harder_benchmark_user_messages[4],  # LoyaltyWallet — accumulated redemption
+    harder_benchmark_user_messages[5],  # calculate_paycheck — holiday override vs overtime
+    harder_benchmark_user_messages[8],  # normalize_phone_number — parsing/normalization
+    harder_benchmark_user_messages[9],  # BudgetAllocator — rollback/state consistency
 ]

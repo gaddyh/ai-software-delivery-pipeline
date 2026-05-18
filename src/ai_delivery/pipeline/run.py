@@ -21,6 +21,8 @@ from ai_delivery.llm.openai_client import OpenAIClient
 from ai_delivery.reporting.report_generator import ReportGenerator
 
 MAX_ITERATIONS = 6
+MAX_TEST_REPAIR_ATTEMPTS = 2
+MAX_TEST_GROUNDING_REPAIR_ATTEMPTS = 1
 
 
 def _extract_traceback(output: str) -> str:
@@ -81,11 +83,14 @@ class RunPipeline:
             "execution_result": None,
             "success": False,
             "iterations": 0,
+            "failure_trace": None,
         }
 
         failure_trace: Optional[FailureTrace] = None
         execution_result = None
         iteration = 0
+        test_repair_attempts = 0
+        test_grounding_repair_attempts = 0
 
         try:
             # ── Stage 1: Task assignment ──────────────────────────────────
@@ -193,16 +198,72 @@ class RunPipeline:
                     failure_trace.history.append(record)
 
                 if iteration < MAX_ITERATIONS:
-                    print(f"  \u2192 Sending FailureAnalysis + FailureTrace to Developer Agent...")
-                    code_artifact = self.developer.generate_code(
-                        task_spec, failure_trace,
-                        current_code=code_artifact.content,
-                        test_code=test_artifact.content,
-                        failure_analysis=failure_analysis,
-                    )
-                    next_code_file = run_dir / f"generated_code_iter{iteration + 1}.py"
-                    next_code_file.write_text(code_artifact.content)
-                    print(f"  \u2192 Refined code saved: {next_code_file.name}")
+                    if failure_analysis.should_review_spec and failure_analysis.should_modify_tests:
+                        if test_grounding_repair_attempts >= MAX_TEST_GROUNDING_REPAIR_ATTEMPTS:
+                            print("  \u2192 Test grounding repair limit reached. Stopping.")
+                            break
+
+                        test_grounding_repair_attempts += 1
+                        print(
+                            f"  \u2192 Routing: review test grounding "
+                            f"(attempt {test_grounding_repair_attempts}/{MAX_TEST_GROUNDING_REPAIR_ATTEMPTS})..."
+                        )
+
+                        test_artifact = self.tester.review_and_repair_test_grounding(
+                            task_spec=task_spec,
+                            current_test_code=test_artifact.content,
+                            current_code=current_code_file.read_text(),
+                            failure_analysis=failure_analysis,
+                            execution_result=execution_result,
+                        )
+
+                        grounding_repair_file = run_dir / f"test_suite_grounding_repair{test_grounding_repair_attempts}.py"
+                        grounding_repair_file.write_text(test_artifact.content)
+                        test_file.write_text(test_artifact.content)
+                        print(f"  \u2192 Grounding-repaired test suite saved: {grounding_repair_file.name}")
+                        continue
+
+                    elif failure_analysis.should_modify_tests and not failure_analysis.should_modify_code:
+                        if test_repair_attempts >= MAX_TEST_REPAIR_ATTEMPTS:
+                            print("  \u2192 Test repair limit reached. Stopping.")
+                            break
+
+                        test_repair_attempts += 1
+                        print(
+                            f"  \u2192 Routing: repair test suite "
+                            f"(attempt {test_repair_attempts}/{MAX_TEST_REPAIR_ATTEMPTS})..."
+                        )
+
+                        test_artifact = self.tester.repair_tests(
+                            task_spec=task_spec,
+                            current_test_code=test_artifact.content,
+                            current_code=current_code_file.read_text(),
+                            failure_analysis=failure_analysis,
+                            execution_result=execution_result,
+                        )
+
+                        repaired_test_file = run_dir / f"test_suite_repair{test_repair_attempts}.py"
+                        repaired_test_file.write_text(test_artifact.content)
+                        test_file.write_text(test_artifact.content)
+                        print(f"  \u2192 Repaired test suite saved: {repaired_test_file.name}")
+                        continue
+
+                    elif failure_analysis.should_modify_code:
+                        print("  \u2192 Routing: repair implementation...")
+                        code_artifact = self.developer.generate_code(
+                            task_spec, failure_trace,
+                            current_code=code_artifact.content,
+                            test_code=test_artifact.content,
+                            failure_analysis=failure_analysis,
+                        )
+                        next_code_file = run_dir / f"generated_code_iter{iteration + 1}.py"
+                        next_code_file.write_text(code_artifact.content)
+                        print(f"  \u2192 Refined code saved: {next_code_file.name}")
+                        continue
+
+                    else:
+                        print("  \u2192 No valid repair route found. Stopping.")
+                        break
 
             results["code_artifact"] = code_artifact
             results["execution_result"] = execution_result
@@ -214,6 +275,7 @@ class RunPipeline:
 
             trace_file = run_dir / "failure_trace_context.json"
             trace_data = failure_trace.model_dump() if failure_trace else {"history": []}
+            results["failure_trace"] = trace_data
             trace_file.write_text(json.dumps(trace_data, indent=2))
 
             print(f"\nStage 6 \u2502 {'SUCCESS' if success else 'FAILURE'} after {iteration} iteration(s)")

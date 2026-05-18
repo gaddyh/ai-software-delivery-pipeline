@@ -1,6 +1,8 @@
 # AI Software Delivery Pipeline
 
-Evaluation-driven system for reliable Python code generation and repair.
+An evaluation-driven AI engineering project that generates Python code, executes real pytest suites, classifies failures by responsible artifact, and routes repair to the right agent.
+
+This is not a one-shot codegen demo. It is a measurable artifact-generation loop for studying how AI software systems fail and recover.
 
 The system converts a natural language software requirement into executable artifacts:
 
@@ -11,18 +13,32 @@ Requirement
 → Generated Code
 → Real Execution
 → Failure Analysis
-→ Iterative Repair
+→ Repair Routing
+   ├── Implementation Repair
+   ├── Test Suite Repair
+   └── Test Grounding Review
 → Quality Critique
 → Engineering Report
 ```
 
-The system uses executable pytest feedback, structured failure analysis, and iterative repair loops to improve generated code reliability over multiple iterations.
+The system uses executable pytest feedback, structured failure classification, and artifact-aware repair routing to improve generated code reliability over multiple iterations.
 
-Unlike one-shot code generation demos, this project uses executable validation loops grounded in real pytest output.
+Unlike one-shot code generation demos, this project classifies failures by responsible artifact — implementation, test suite, or spec/test expectation — and routes repair accordingly.
 
 ---
 
-[Benchmark](#benchmark-results) · [Architecture](#architecture) · [Walkthrough](#example-walkthrough) · [What This Proves](#what-this-project-proves) · [Known Limitations](#known-limitations) · [Future Work](#planned-improvements)
+[Benchmark](#benchmark-results) · [Architecture](#architecture) · [Walkthrough](#example-walkthrough) · [What This Proves](#what-this-project-proves) · [Known Limitations](#known-limitations) · [Next Milestones](#next-engineering-milestones)
+
+---
+
+## Reviewer Path
+
+If you only have 2 minutes:
+
+1. Read [Failure-Aware Repair Routing](#failure-aware-repair-routing)
+2. Check [Latest Hard Benchmark](#latest-hard-benchmark) — full report at [`reports/hard_benchmark_latest.md`](reports/hard_benchmark_latest.md)
+3. Read a curated run report: [`reports/example_run_report.md`](reports/example_run_report.md)
+4. Inspect `failure_analysis_iterN.json` in any run directory to see artifact-level routing
 
 ---
 
@@ -72,23 +88,23 @@ Batch run executed on 2026-05-12 using 5 progressive tasks:
 | Avg Repair Iterations | 0.2 |
 | Critic Rejections | 0 |
 
-### MVP Benchmark Suite B
+### Latest Hard Benchmark
 
-Batch run using 5 tasks with increased complexity, recorded before the failure-analysis and repair-mode improvements:
+Batch run on 2026-05-18 using the failure-aware routing pipeline (`harder_mvp1_benchmark_set`, 5 tasks).
 
-| # | Task | Status | Iterations |
-|---|------|--------|------------|
-| 1 | calculate_coupon_discount | ✗ Failed | 6 |
-| 2 | calculate_late_fee | ✓ Passed | 2 |
-| 3 | LoginAttemptTracker | ✓ Passed | 1 |
-| 4 | OrderStateMachine | ✓ Passed | 1 |
-| 5 | RoomBooking | ✓ Passed | 2 |
+Full report: [`reports/hard_benchmark_latest.md`](reports/hard_benchmark_latest.md)
 
-**80% task convergence (4/5)** — pre-repair-mode upgrade
+| Task | Result | Iterations | What it exposed |
+|------|-------:|----------:|---|
+| calculate_coupon_discount | ✓ Passed | 1 | First-pass success. Caps, rule ordering, and 25% discount cap handled correctly. |
+| LoginAttemptTracker | ✓ Passed | 1 | First-pass success. Lock behavior and reset logic handled correctly. |
+| OrderStateMachine | ✓ Passed | 2 | Iteration 1: `list_orders_by_status` returned insertion order. Classified as `assertion_mismatch / implementation`. Repaired in iteration 2. |
+| RoomBooking | ✓ Passed | 1 | First-pass success. Previously exposed test-grounding issue — now generates correctly grounded tests. |
+| BudgetAllocator | ✓ Passed | 1 | First-pass success. Over-budget allocation and reset constraints handled correctly. |
 
-**Known weakness at the time:** Arithmetic composition with caps/modifiers (tiered calculations, override rules, caps). The failure analyzer was inferring failure category from test names rather than reading assertion evidence, and the developer was allowed to drift into business-rule changes on precision failures.
+**Pass rate: 5/5**
 
-**Status:** This result predates the Phase 1 repair-mode upgrade (failure category extraction, `_get_repair_mode()`, PRECISION/FORCED_PRECISION repair modes). Suite B should be rerun against the updated codebase before treating this as a current result.
+This benchmark is not presented as a solved system. It is used to verify routing behavior, expose failure modes, and measure the effect of pipeline changes under executable feedback.
 
 ### Failure Categories Observed
 
@@ -109,23 +125,63 @@ User Requirement
       ↓
 Orchestrator Agent → TaskSpec
       ↓
-Tester Agent → Fixed Pytest Suite
+Tester Agent → Initial Pytest Suite
       ↓
 Developer Agent → Initial Code
       ↓
 Pytest Runner
-  ↓ (fail)               ↓ (pass)
-Failure Analyzer    Quality Critic → Run Report
-      ↓                   ↑
-Developer Agent (repair) ─┘
+      ↓
+Failure Analyzer
+      ↓
+Repair Router
+ ├── implementation bug ──────────→ Developer Agent
+ ├── test collection error ───────→ TesterAgent.repair_tests
+ ├── ungrounded test expectation ──→ TesterAgent.review_and_repair_test_grounding
+ └── pass ───────────────────→ Quality Critic
+                                          ↓
+                                      Run Report
 ```
 
-The Tester Agent runs once per task. The test suite remains fixed during all repair iterations.
+The initial test suite is fixed during implementation repair. The Tester Agent is only called again when the failure analyzer attributes the problem to the test artifact itself — such as collection errors or ungrounded test expectations.
 
-```text
-Code failed → return to Developer Agent
-Spec changed → regenerate tests with Tester Agent
-```
+---
+
+## Failure-Aware Repair Routing
+
+The first version of the pipeline treated every pytest failure as an implementation bug.
+
+Harder benchmark runs exposed that this was wrong. Some failures came from generated test suites, not generated code.
+
+| Failure Type | Responsible Artifact | Route |
+|---|---|---|
+| `test_syntax_error` | test suite | `TesterAgent.repair_tests` |
+| `test_indentation_error` | test suite | `TesterAgent.repair_tests` |
+| `test_import_error` | test suite | `TesterAgent.repair_tests` |
+| `numeric_precision` | implementation | minimal developer repair |
+| `assertion_mismatch` | implementation | developer repair |
+| `spec_test_conflict` | test expectation / spec | `TesterAgent.review_and_repair_test_grounding` |
+| `test_expectation_not_grounded` | test suite | `TesterAgent.review_and_repair_test_grounding` |
+
+Routing priority (defensive ordering in `run.py`):
+
+1. `should_review_spec AND should_modify_tests` → test grounding review (max 1 attempt)
+2. `should_modify_tests AND NOT should_modify_code` → test syntax/collection repair (max 2 attempts)
+3. `should_modify_code` → implementation repair
+4. else → stop
+
+This prevents wasting all repair iterations on the wrong artifact.
+
+---
+
+## What Changed During Development
+
+1. **Naive repair loop** — Every failure was sent to the Developer Agent.
+
+2. **Structured failure analysis** — Pytest output was converted into normalized failure types and routing hints via a schema-enforced LLM call.
+
+3. **Failure-aware routing** — Test-suite failures were routed to the Tester Agent instead of wasting implementation repair iterations.
+
+4. **Test grounding review** — Some valid pytest failures were recognized as possible test/spec conflicts rather than pure implementation bugs. The system checks whether the test's expected value is consistent with the spec's declared return type before modifying anything.
 
 ---
 
@@ -142,6 +198,10 @@ Spec changed → regenerate tests with Tester Agent
 | Artifact-based engineering | Every run produces inspectable JSON and Python file artifacts |
 | Run-level observability | Full iteration history and engineering report per run |
 | Evaluation-driven development | Benchmark suite with convergence metrics across task categories |
+| Failure attribution | The system decides whether the responsible artifact is implementation, test suite, or spec/test expectation |
+| Repair routing | Different failure types route to different agents instead of always rewriting code |
+| Test-suite repair | Collection errors such as syntax or indentation failures are repaired by the Tester Agent |
+| Test grounding review | The system can detect when a test expectation may not be supported by the original spec |
 
 ---
 
@@ -170,6 +230,8 @@ Each execution produces a versioned artifact directory under `artifacts/runs/{ru
 ---
 
 ## Example Walkthrough
+
+> **Note:** This walkthrough shows the simplest repair route: implementation repair. The pipeline also supports test-suite repair (collection errors routed to `TesterAgent.repair_tests`) and test-grounding review (ungrounded expectations routed to `TesterAgent.review_and_repair_test_grounding`).
 
 **Task:** `OrderStateMachine` — 2 iterations, 1 subtle failure, clean repair
 
@@ -296,17 +358,24 @@ The Failure Analyzer reads the pytest output and produces a structured diagnosis
 
 ```json
 {
-  "failed_tests": ["test_cancel_order_successfully"],
-  "inferred_rules": [
-    "An order should transition to 'cancelled' state (with British spelling) when canceled successfully."
-  ],
-  "likely_bug": "The system returns 'canceled' instead of 'cancelled', indicating a spelling inconsistency.",
-  "patch_instruction": "Review the OrderStateMachine to ensure it uses 'cancelled' (with British English spelling) instead of 'canceled' for order cancellation state consistency, and update the get_status method accordingly.",
-  "expected_value": "cancelled",
-  "actual_value": "canceled",
-  "difference": "Difference in spelling: 'canceled' in American English vs 'cancelled' in British English.",
-  "failure_category": "validation_error",
-  "confidence": 0.9
+  "primary_failure_type": "assertion_mismatch",
+  "primary_blamed_artifact": "implementation",
+  "recommended_action": "repair_implementation",
+  "should_modify_code": true,
+  "should_modify_tests": false,
+  "should_review_spec": false,
+  "routing_reason": "The implementation returns 'canceled' but the spec requires 'cancelled'. This is an implementation spelling error.",
+  "failed_tests": [
+    {
+      "test_name": "test_cancel_order_successfully",
+      "failure_type": "assertion_mismatch",
+      "blamed_artifact": "implementation",
+      "expected": "cancelled",
+      "actual": "canceled",
+      "confidence": 0.95,
+      "error_message": "AssertionError: assert 'canceled' == 'cancelled'"
+    }
+  ]
 }
 ```
 
@@ -358,23 +427,24 @@ Run complete. All artifacts written to `artifacts/runs/20260512_115150/`.
 
 - No execution sandboxing (generated code runs in the local process environment)
 - Single-candidate generation only (no parallel candidate sampling)
-- No retrieval grounding for spec generation
+- The system does not yet detect repeated stuck failures across iterations
+- The system does not yet roll back to the best previous implementation after a repair regression
+- The Code Quality Critic can produce false positives, especially around numeric constants that are explicitly part of the spec
+- Generated tests can still contain ungrounded expectations even after initial generation
+- Test grounding review exists, but its own judge quality is not yet evaluated
+- There is no independent hidden-test validation yet
 - No dataset-level regression harness
-- Limited benchmark diversity (Python functions and classes only)
-- No semantic equivalence verification between iterations
 
 ---
 
-## Planned Improvements
+## Next Engineering Milestones
 
-- Sandboxed execution environment
-- Parallel candidate generation with selection
-- Self-play benchmark generation
-- MLflow/Evidently evaluation tracking
-- Dataset-driven regression testing
-- LangGraph orchestration runtime
-- Multi-language support
-- Retrieval-augmented spec grounding
+1. **FailureProgressAnalyzer** — Detect repeated failure signatures, stuck loops, and repair regressions across iterations.
+2. **Judge evaluation harness** — Evaluate FailureAnalyzer, Test Grounding Reviewer, and CodeQualityCritic on labeled examples.
+3. **Test-suite validation stage** — Validate generated tests against the spec before implementation repair begins.
+4. **Best-artifact rollback** — Roll back to the best previous implementation when repair makes the system worse.
+
+**Longer-term:** sandboxed execution, parallel candidate generation, LangGraph orchestration runtime, dataset-level regression harness.
 
 ---
 
@@ -573,10 +643,13 @@ A structured diagnosis generated from failed pytest output.
 
 Includes:
 
-- failed tests
-- inferred rules
-- likely bug
-- patch instruction
+- per-test `failure_type` (normalized enum: `assertion_mismatch`, `spec_test_conflict`, `test_syntax_error`, etc.)
+- `blamed_artifact` — which artifact is responsible: `implementation`, `test_suite`, or `spec_or_test_expectation`
+- `recommended_action` — next repair route: `repair_implementation`, `repair_test_suite`, `review_test_grounding`, etc.
+- `should_modify_code` / `should_modify_tests` / `should_review_spec` — routing flags
+- `routing_reason` — one-sentence explanation of the routing decision
+- `failure_signature` — stable normalized signature used to detect repeated failures
+- `lesson` — reusable insight for future iterations
 
 ### `quality_report_iterN.json`
 
@@ -617,11 +690,12 @@ The Orchestrator is responsible for turning vague user language into a clear beh
 
 ### Tester Agent
 
-Creates a fixed pytest suite from the structured `TaskSpec`.
+Creates a pytest suite from the structured `TaskSpec`.
 
-The Tester Agent runs once per task.
+The initial test suite is generated once and is fixed during all implementation repair iterations. The Tester Agent is called again only when the failure analyzer attributes the problem to the test artifact itself:
 
-It should not depend on generated implementation code. Its job is to encode expected behavior from the task specification.
+- `repair_tests` — fixes structural issues: syntax errors, indentation errors, import failures. Does not change business intent.
+- `review_and_repair_test_grounding` — reviews test *expected values* against the spec's declared return types and method contracts. Changes a test only if its expectation is not supported by the spec.
 
 Good tests should be rule-specific. For a function task:
 
@@ -680,26 +754,33 @@ This is the factual feedback source for the loop.
 
 ### Failure Analyzer
 
-Converts raw pytest failure output into a structured debugging artifact.
+Converts raw pytest failure output into a structured `FailureAnalysis` artifact with normalized routing fields.
 
 Example:
 
 ```json
 {
+  "primary_failure_type": "spec_test_conflict",
+  "primary_blamed_artifact": "spec_or_test_expectation",
+  "recommended_action": "review_test_grounding",
+  "should_modify_code": false,
+  "should_modify_tests": true,
+  "should_review_spec": true,
+  "routing_reason": "The test expected room name in get_bookings output, but the TaskSpec declares get_bookings(room: str) -> list[tuple[int, int]].",
   "failed_tests": [
-    "test_weight_tier_2_base_cost",
-    "test_regional_destination_surcharge"
-  ],
-  "inferred_rules": [
-    "For package_weight 3.0 in local zone, shipping should be 10.0.",
-    "For package_weight 3.0 in regional zone, shipping should be 14.0."
-  ],
-  "likely_bug": "The implementation incorrectly calculates base costs and surcharges.",
-  "patch_instruction": "Correct the weight tiers and apply destination surcharge after base cost calculation."
+    {
+      "test_name": "test_get_bookings_returns_correct_slots",
+      "failure_type": "spec_test_conflict",
+      "blamed_artifact": "spec_or_test_expectation",
+      "expected": "[('room1', 9, 11)]",
+      "actual": "[(9, 11)]",
+      "confidence": 0.92
+    }
+  ]
 }
 ```
 
-The Failure Analyzer reduces ambiguity before sending the problem back to the Developer Agent.
+The failure type and routing flags drive which agent is called next. The system does not always send failures back to the Developer Agent.
 
 ---
 
@@ -812,37 +893,25 @@ If tests fail, the pipeline moves to failure analysis.
 
 ---
 
-### Stage 5: Failure Analysis and Refinement
+### Stage 5: Failure Analysis and Repair Routing
 
-When tests fail, the Failure Analyzer reads the pytest output and produces a structured diagnosis.
+When tests fail, the Failure Analyzer reads the pytest output and produces a structured `FailureAnalysis` with normalized failure types, blamed artifact, and routing flags.
 
-The Developer Agent then receives:
+The Repair Router then selects the appropriate repair path:
 
-```text
-TaskSpec
-+
-Current code
-+
-Pytest output
-+
-Failure analysis
-+
-Failure history
-```
+**Route 1 — Implementation repair** (`should_modify_code = true`)
 
-The Developer produces a revised implementation:
+The Developer Agent receives TaskSpec, current code, pytest output, failure analysis, and failure history. It produces a revised implementation.
 
-```text
-generated_code_iter2.py
-```
+**Route 2 — Test suite repair** (`should_modify_tests = true`, `should_modify_code = false`)
 
-The same fixed test suite is executed again.
+The Tester Agent's `repair_tests` method fixes structural issues: syntax errors, indentation errors, import failures. Business intent is preserved.
 
-This loop continues until:
+**Route 3 — Test grounding review** (`should_review_spec = true`, `should_modify_tests = true`)
 
-- tests pass
-- max iterations are reached
-- the system fails to converge
+The Tester Agent's `review_and_repair_test_grounding` method checks whether failing test expectations are consistent with the spec's declared return types. A test is only changed if its expectation is not supported by the spec.
+
+The same fixed test suite (or repaired suite) is executed again after each repair. This loop continues until tests pass, the system reaches max iterations, or no valid repair route is found.
 
 ---
 
@@ -864,9 +933,11 @@ run_report.md
 
 ## Current Status
 
-Project 1 MVP is working for small Python function/class tasks.
+This is a working MVP of an evaluation-driven AI software delivery loop for small Python function/class tasks.
 
-The current version supports:
+The project is intentionally scoped: the goal is not broad code generation, but measurable repair behavior under executable feedback.
+
+Current capabilities:
 
 - raw user requirement input
 - structured task specification with public API (`class_name` + `methods`)
